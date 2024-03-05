@@ -1,0 +1,7 @@
+obsidian/aerial/daily-notes
+data/
+pkgs/
+simulation/
+experiments/
+paper_implementations/
+*.pdf

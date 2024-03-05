@@ -1,0 +1,211 @@
+{
+  "main": {
+    "id": "d419e45c28996cb2",
+    "type": "split",
+    "children": [
+      {
+        "id": "4bc668c100f1dd70",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "830b415a4ed6fb83",
+            "type": "leaf",
+            "state": {
+              "type": "pdf",
+              "state": {
+                "file": "papers/Point2color - 3D Point Cloud Colorization Using a Conditional Generative Network and Differentiable Rendering for Airborne LiDAR/Shinohara et al. - 2021 - Point2color 3D Point Cloud Colorization Using a C.pdf"
+              }
+            }
+          },
+          {
+            "id": "54befe686f8533f4",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "papers/Point2color - 3D Point Cloud Colorization Using a Conditional Generative Network and Differentiable Rendering for Airborne LiDAR/Point2color - 3D Point Cloud Colorization Using a Conditional Generative Network and Differentiable Rendering for Airborne LiDAR.md",
+                "mode": "source",
+                "source": false
+              }
+            }
+          }
+        ],
+        "currentTab": 1
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "ad739676c873455c",
+    "type": "split",
+    "children": [
+      {
+        "id": "33705b4235b52b0b",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "59de9526595a39f6",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical"
+              }
+            }
+          },
+          {
+            "id": "07503ea40221be4b",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              }
+            }
+          },
+          {
+            "id": "b10bf0f47dd17e1c",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {}
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 270.5
+  },
+  "right": {
+    "id": "bdc7ae5a6c56cd08",
+    "type": "split",
+    "children": [
+      {
+        "id": "affd048ba1575df0",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "6a03e4523c2707eb",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "papers/Point2color - 3D Point Cloud Colorization Using a Conditional Generative Network and Differentiable Rendering for Airborne LiDAR/Point2color - 3D Point Cloud Colorization Using a Conditional Generative Network and Differentiable Rendering for Airborne LiDAR.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              }
+            }
+          },
+          {
+            "id": "da551a796301c65a",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "papers/Point2color - 3D Point Cloud Colorization Using a Conditional Generative Network and Differentiable Rendering for Airborne LiDAR/Point2color - 3D Point Cloud Colorization Using a Conditional Generative Network and Differentiable Rendering for Airborne LiDAR.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              }
+            }
+          },
+          {
+            "id": "5d295a0e5dfc93c4",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true
+              }
+            }
+          },
+          {
+            "id": "72398d2cb49a65a3",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "papers/Point2color - 3D Point Cloud Colorization Using a Conditional Generative Network and Differentiable Rendering for Airborne LiDAR/Point2color - 3D Point Cloud Colorization Using a Conditional Generative Network and Differentiable Rendering for Airborne LiDAR.md"
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false
+    }
+  },
+  "active": "54befe686f8533f4",
+  "lastOpenFiles": [
+    "papers/Learning from Simulated and Unsupervised Images through Adversarial Training/Learning from Simulated and Unsupervised Images through Adversarial Training.md",
+    "papers/Color Image Generation from LiDAR Reflection Data/Color Image Generation from LiDAR Reflection Data by Using Selected Connection UNET.md",
+    "papers/Automatic Point Cloud Colorization of Ground-Based LiDAR Data Using Video Imagery without Position and Orientation System/Automatic Point Cloud Colorization of Ground-Based LiDAR Data Using Video Imagery without Position and Orientation System.md",
+    "papers/A Post-Scan Point Cloud Colorization Method for Cultural Heritage Documentation/A Post-Scan Point Cloud Colorization Method for Cultural Heritage Documentation.md",
+    "daily-notes/2024-03-04.md",
+    "daily-notes/2024-03-05.md",
+    "daily-notes/2024-02-28.md",
+    "papers/Point2color - 3D Point Cloud Colorization Using a Conditional Generative Network and Differentiable Rendering for Airborne LiDAR/Shinohara et al. - 2021 - Point2color 3D Point Cloud Colorization Using a C.pdf",
+    "papers/Color Image Generation from LiDAR Reflection Data/Kim et al. - 2020 - Color Image Generation from LiDAR Reflection Data .pdf",
+    "papers/Learning from Simulated and Unsupervised Images through Adversarial Training/Shrivastava et al. - 2017 - Learning from Simulated and Unsupervised Images th.pdf",
+    "daily-notes/2024-03-01.md",
+    "daily-notes/2024-02-29.md",
+    "daily-notes/2024-02-27.md",
+    "flow/Training data generation.md",
+    "flow",
+    "Untitled.md",
+    "Untitled 2.canvas",
+    "Untitled 1.canvas",
+    "Untitled.canvas",
+    "papers/Unpaired Image-to-Image Translation using Cycle-Consistent Adversarial Networks/Unpaired Image-to-Image Translation using Cycle-Consistent Adversarial Networks.md",
+    "papers/Automatic Point Cloud Colorization of Ground-Based LiDAR Data Using Video Imagery without Position and Orientation System/Xu et al. - 2023 - Automatic Point Cloud Colorization of Ground-Based.pdf",
+    "papers/A Post-Scan Point Cloud Colorization Method for Cultural Heritage Documentation/Chan et al. - 2021 - A Post-Scan Point Cloud Colorization Method for Cu.pdf",
+    "papers/Point2color - 3D Point Cloud Colorization Using a Conditional Generative Network and Differentiable Rendering for Airborne LiDAR/Point2color - 3D Point Cloud Colorization Using a Conditional Generative Network and Differentiable Rendering for Airborne LiDAR.md",
+    "papers/Unpaired Image-to-Image Translation using Cycle-Consistent Adversarial Networks/Zhu et al. - 2020 - Unpaired Image-to-Image Translation using Cycle-Co.pdf",
+    "papers/Scene-level Point Cloud Colorization with Semantic/Gao et al. - 2023 - Scene-level Point Cloud Colorization with Semantic.pdf",
+    "papers/Scene-level Point Cloud Colorization with Semantic/Scene-level Point Cloud Colorization with Semantics-and-geometry-aware Networks.md",
+    "Point2color.md",
+    "papers/Unsupervised Pixel–Level Domain Adaptation with Generative Adversarial Networks/Bousmalis et al. - 2017 - Unsupervised Pixel-Level Domain Adaptation with Ge.pdf",
+    "papers/Unsupervised Cross-Domain Image Generation/Taigman et al. - 2016 - Unsupervised Cross-Domain Image Generation.pdf",
+    "papers/Automatic Point Cloud Colorization of Ground-Based LiDAR Data Using Video Imagery without Position and Orientation System/Untitled.png",
+    "papers/Point2color 3D Point Cloud Colorization Using a Co/Untitled.png",
+    "papers/Point2color 3D Point Cloud Colorization Using a Co/Point2color - 3D Point Cloud Colorization Using a Conditional Generative Network and Differentiable Rendering for Airborne LiDAR.md",
+    "papers/Scene-level Point Cloud Colorization with Semantic/Untitled.png",
+    "papers/Scene-level Point Cloud Colorization with Semantic/Untitled 2.png",
+    "papers/Scene-level Point Cloud Colorization with Semantic/Untitled 1.png",
+    "papers/Color Image Generation from LiDAR Reflection Data/Untitled.png",
+    "papers/Point2color 3D Point Cloud Colorization Using a Co 75d9c8b23832408294abf503d77c56c9/Point2color - 3D Point Cloud Colorization Using a Conditional Generative Network and Differentiable Rendering for Airborne LiDAR.md",
+    "papers/StarGAN v2 - Diverse Image Synthesis for Multiple Domains/StarGAN v2 - Diverse Image Synthesis for Multiple Domains.md",
+    "papers/Unsupervised Cross-Domain Image Generation/Unsupervised Cross-domain Image Generation.md",
+    "papers/StarGAN - Unified Generative Adversarial Networksfor Multi-Domain Image-to-Image Translation/StarGAN - Unified Generative Adversarial Networksfor Multi-Domain Image-to-Image Translation.md",
+    "papers/Scene-level Point Cloud Colorization with Semantic c7377e044b3e49f1a340120b0117e41d/Scene-level Point Cloud Colorization with Semantics-and-geometry-aware Networks.md",
+    "papers/Color Image Generation from LiDAR Reflection Data  21ae8ab4fe66484f809c9e6bd127bec1/Color Image Generation from LiDAR Reflection Data by Using Selected Connection UNET.md",
+    "papers/Unsupervised Pixel–Level Domain Adaptation with Generative Adversarial Networks/Unsupervised Pixel–Level Domain Adaptation with Generative Adversarial Networks.md",
+    "papers/Unsupervised Cross-Domain Image Generation/Pasted image 20240229113109.png",
+    "().md",
+    "papers/Learning from Simulated and Unsupervised Images through Adversarial Training/Pasted image 20240227180936.png",
+    "papers/Learning from Simulated and Unsupervised Images through Adversarial Training/Pasted image 20240227173000.png",
+    "papers/Unsupervised Pixel–Level Domain Adaptation with Generative Adversarial Networks/Pasted image 20240227165339.png"
+  ]
+}
