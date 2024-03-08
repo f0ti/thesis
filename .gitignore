@@ -1,7 +1,9 @@
 obsidian/aerial/daily-notes
-data/
+obsidian/.obsidian
+dataset/data/
 pkgs/
 simulation/
 experiments/
 paper_implementations/
 *.pdf
+__pycache__/
