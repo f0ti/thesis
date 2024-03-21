@@ -4,6 +4,6 @@ dataset/data/
 pkgs/
 simulation/
 experiments/
-paper_implementations/
+models/
 *.pdf
 __pycache__/

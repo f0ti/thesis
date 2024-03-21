@@ -1,14 +1,13 @@
 import torch
 
-
 class Point:
-    X: torch.short  # 16-bit signed integer
-    Y: torch.short
-    Z: torch.short
+    X: torch.half  # 16-bit signed floating point
+    Y: torch.half
+    Z: torch.half
     R: torch.uint8  # unsigned 8-bit integer
     G: torch.uint8
     B: torch.uint8
-    intensity: torch.short
+    intensity: torch.half
 
     def __init__(self, X, Y, Z, R, G, B, intensity) -> None:
         self.X = X
