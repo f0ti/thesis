@@ -2,7 +2,7 @@ import os
 import numpy as np
 import open3d as o3d
 import laspy
-from point import Point
+from dataset.utils.point import Point
 
 DATA_DIR = "../data/CoM_Point_Cloud_2018_LAS"
 

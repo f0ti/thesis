@@ -8,8 +8,9 @@ class Point:
     G: torch.uint8
     B: torch.uint8
     intensity: torch.half
+    isEmpty: bool
 
-    def __init__(self, X, Y, Z, R, G, B, intensity) -> None:
+    def __init__(self, X, Y, Z, R, G, B, intensity, isEmpty) -> None:
         self.X = X
         self.Y = Y
         self.Z = Z
@@ -17,34 +18,7 @@ class Point:
         self.G = G
         self.B = B
         self.intensity = intensity
+        self.isEmpty = isEmpty
 
     def __repr__(self) -> str:
-        return f"({self.X}, {self.Y}, {self.Z}), ({self.R}, {self.G}, {self.B}), {self.intensity}"
-
-    @property
-    def X(self):
-        return self.X
-
-    @property
-    def Y(self):
-        return self.Y
-
-    @property
-    def Z(self):
-        return self.Z
-
-    @property
-    def R(self):
-        return self.R
-
-    @property
-    def G(self):
-        return self.G
-
-    @property
-    def B(self):
-        return self.B
-
-    @property
-    def intensity(self):
-        return self.intensity
+        return f"({self.X}, {self.Y}, {self.Z}), ({self.R}, {self.G}, {self.B}), {self.intensity}, {self.isEmpty}"

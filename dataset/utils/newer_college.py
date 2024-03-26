@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import open3d as o3d
-from point import Point
+from dataset.utils.point import Point
 
 DATA_DIR = "../data/newer_college/03_new_college_prior_map"
 
