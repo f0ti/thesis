@@ -7,3 +7,5 @@ experiments/
 models/
 *.pdf
 __pycache__/
+.vscode/
+*.pcd
