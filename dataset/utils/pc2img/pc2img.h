@@ -67,6 +67,7 @@ typedef struct __attribute__((__packed__))
     uint32_t    numberOfExtendedVariableLengthRecords;
     uint64_t    numberOfPointRecords;
     uint64_t    numberOfPointsbyReturn[15];
+
 } LASPublicHeader_t;
 
 typedef struct __attribute__((__packed__))
@@ -83,10 +84,11 @@ typedef struct __attribute__((__packed__))
     int8_t      scanAngle;
     uint8_t     userData;
     uint16_t    pointSourceId;
+
 } LASPointCommon012345_t;
 
-typedef struct __attribute__((__packed__)) {
-   
+typedef struct __attribute__((__packed__))
+{   
     double       x;
     double       y;
     double       z;
@@ -96,7 +98,7 @@ typedef struct __attribute__((__packed__)) {
     uint8_t     intensity;
     uint32_t    pointId;
     bool        isEmpty;
-    
+
 } Point;
 
 typedef struct __attribute__((__packed__)) {
@@ -108,8 +110,8 @@ typedef struct __attribute__((__packed__)) {
 
 typedef struct __attribute__((__packed__)) {
     
-    float        width;
-    float        height;
+    // float        width;
+    // float        height;
     uint32_t     numberOfPoints;
     
 } BinaryHeader;
@@ -140,7 +142,7 @@ typedef struct __attribute__((__packed__)) {
     
 } Image;
 
-#define PIXEL_LIMIT_PER_DIM 1024
+#define PIXEL_LIMIT_PER_DIM 256
 
 CellArr initializeCells(LASPublicHeader_t *lasHeader, int cellSize);
 CellArr assignPointsToCells(const char *lasFileName);
@@ -152,7 +154,7 @@ Image createImageFromCell(Cell *currentCell, Point minPoint, double resolution, 
 double calculateMaxDim(Point minPoint, Point maxPoint);
 uint32_t writeToLasFile(const char *lasFileName, PointsArr pointsArr);
 void writeToBinaryFile(const char *binFileName, PointsArr pointsToWrite, BinaryHeader headerToWrite);
-void readBinaryFile(const char *binFileName);
+PointsArr readBinaryFile(const char *binFileName);
 void pointCloud2Images(const char *lasFileName);
 
 #ifdef __cplusplus

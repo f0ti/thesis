@@ -9,3 +9,6 @@ models/
 __pycache__/
 .vscode/
 *.pcd
+*.las
+*.zip
+*pc2img

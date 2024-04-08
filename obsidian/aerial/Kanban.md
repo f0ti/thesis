@@ -7,6 +7,7 @@ kanban-plugin: basic
 ## ToDo
 
 - [ ] decide on dataset format(contain point information and association map)
+- [ ] change pixel limit
 
 
 ## Progress
@@ -18,6 +19,8 @@ kanban-plugin: basic
 ## Completed
 
 - [ ] Estonian Elevation Data API download
+- [ ] visualize image with OpenCV
+- [ ] change Point.pu
 - [ ] read binary file format with Python
 
 

@@ -6,9 +6,9 @@
 //
 
 #include "pc2img.h"
-#include <math.h>
 #include <string.h>
 
+// setu
 CellArr initializeCells(LASPublicHeader_t *lasHeader, int cellSize)
 {
     // calculate the number of rows and cells based on the cell size
@@ -221,28 +221,49 @@ void writeToBinaryFile(const char *binFileName, PointsArr pointsToWrite, BinaryH
         headerToWrite.numberOfPoints = pointsWritten;
         fseek(file, 0, SEEK_SET);
         fwrite(&headerToWrite, sizeof(BinaryHeader), 1, file);
+        printf("%lu \n", sizeof(BinaryHeader));
+        printf("%u \n", pointsWritten);
     }
     fclose(file);
 }
 
-void readBinaryFile(const char *binFileName)
+PointsArr readBinaryFile(const char *binFileName)
 {
+    PointsArr pointsArr;
+    pointsArr.numberOfPoints = 0;
+    pointsArr.points = (Point*)malloc(pointsArr.numberOfPoints * sizeof(Point));
+
     BinaryHeader header;
     FILE *file = fopen(binFileName, "rb");
     
     if(file != NULL)
     {
         fread(&header, sizeof(BinaryHeader), 1, file);
-        printf("%u \n", header.numberOfPoints);    //this should print 5
+        pointsArr.numberOfPoints = header.numberOfPoints;
+        printf("%u \n", pointsArr.numberOfPoints);    
+
+        pointsArr.points = (Point*)realloc(pointsArr.points, pointsArr.numberOfPoints * sizeof(Point));
+        fread(pointsArr.points, sizeof(Point), pointsArr.numberOfPoints, file);
         
-        Point point;
-        for(int i = 0; i<header.numberOfPoints; i++)
-        {
-            fread(&point, sizeof(Point), 1, file);
-            printf("%f %f %f %d\n", point.x, point.y, point.z, point.isEmpty);
-            printf("\n");
-        }
+        // for (size_t i = 0; i < pointsArr.numberOfPoints; i++)
+        // {   
+        //     if(pointsArr.points[i].isEmpty == false)
+        //     {
+        //         printf("%f %f %f %u %u %u %d\n", pointsArr.points[i].x, pointsArr.points[i].y, pointsArr.points[i].z, pointsArr.points[i].red, pointsArr.points[i].green, pointsArr.points[i].blue, pointsArr.points[i].isEmpty);
+        //     }
+        // }
+        
+        // Point point;
+        // for(int i = 0; i<header.numberOfPoints; i++)
+        // {
+        //     fread(&point, sizeof(Point), 1, file);
+        //     printf("%f %f %f %d\n", point.x, point.y, point.z, point.isEmpty);
+        //     printf("\n");
+        // }
     }
+    fclose(file);
+
+    return pointsArr;
 }
 
 void pointCloud2Images(const char *lasFileName)
@@ -273,8 +294,9 @@ void pointCloud2Images(const char *lasFileName)
             printf("%s \n", currentBinFileName);
             
             BinaryHeader currentHeader;
-            currentHeader.width = currentImage.nCols;
-            currentHeader.height = currentImage.nRows;
+            // currentHeader.numberOfPoints = 0;
+            // currentHeader.width = currentImage.nCols;
+            // currentHeader.height = currentImage.nRows;
             
             writeToBinaryFile(currentBinFileName, currentImage.pointsArr, currentHeader);
         }
@@ -297,11 +319,25 @@ void pointCloud2Images(const char *lasFileName)
             printf("%s \n", currentBinFileName);
             
             BinaryHeader currentHeader;
-            currentHeader.width = currentImage.nCols;
-            currentHeader.height = currentImage.nRows;
+            currentHeader.numberOfPoints = 0;
+            // currentHeader.width = currentImage.nCols;
+            // currentHeader.height = currentImage.nRows;
             
             writeToBinaryFile(currentBinFileName, currentImage.pointsArr, currentHeader);
             printf("\n");
         }
     }
+}
+
+int main(int argc, const char * argv[]) {
+    
+    // char fileName[512];
+    // snprintf(fileName, 512, "Tile_+003_+005.las");
+    // pointCloud2Images(fileName);
+
+    PointsArr arr = readBinaryFile("Tile_+003_+005_0_0");
+    printf("%d\n", arr.numberOfPoints);
+    printf("%f %f %f %u %u %u %d\n", arr.points[0].x, arr.points[0].y, arr.points[0].z, arr.points[0].red, arr.points[0].green, arr.points[0].blue, arr.points[0].isEmpty);
+
+    return 0;
 }
