@@ -30,13 +30,12 @@ class Tile:
     def read_points(self):
         with open(self.filename, 'rb') as reader:
             # read header
-            # width = int.from_bytes(reader.read(4), byteorder='little')
-            # height = int.from_bytes(reader.read(4), byteorder='little')
-            # print(reader.read(8))
-            
-            nr_points = int.from_bytes(reader.read(4), byteorder='little')
+            h_data = unpack('ff', reader.read(8))
+            self.width = int(h_data[0])
+            self.height = int(h_data[1])
+            self.nr_points = int.from_bytes(reader.read(4), byteorder='little')
 
-            for _ in tqdm(range(nr_points)):
+            for _ in tqdm(range(self.nr_points)):
                 data = unpack('<dddHHHBI?', reader.read(36))
 
                 x = data[0]
@@ -52,13 +51,21 @@ class Tile:
                 point = Point(x, y, z, r, g, b, intensity, point_id, bool)
                 self.points.append(point)
 
-            print(f"Read {nr_points} points from {self.filename}")
+            print(f"Read {self.nr_points} points from {self.filename}")
 
     def show(self):
-        width, length = 1024, 1024
-        img = np.asarray(self.colors, dtype=np.uint8).reshape(width, length, 3)
+        # search if tile name exists in imgs folder
         img_name = self.filename.split('/')[-1]
-
+        try:
+            img = plt.imread(f"imgs/{img_name}.png")
+        except FileNotFoundError:            
+            img = np.asarray(self.colors, dtype=np.uint8).reshape(self.width, self.height, 3)
+        
         plt.imshow(img)
-        plt.imsave(f"imgs/{img_name}", img)
+        plt.show()
+
+    def save(self):
+        img = np.asarray(self.colors, dtype=np.uint8).reshape(self.width, self.height, 3)
+        img_name = self.filename.split('/')[-1]
+        plt.imsave(f"imgs/{img_name}.png", img)
         plt.show()

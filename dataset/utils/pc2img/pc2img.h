@@ -110,8 +110,8 @@ typedef struct __attribute__((__packed__)) {
 
 typedef struct __attribute__((__packed__)) {
     
-    // float        width;
-    // float        height;
+    float        width;
+    float        height;
     uint32_t     numberOfPoints;
     
 } BinaryHeader;

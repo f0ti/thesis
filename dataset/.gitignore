@@ -1,5 +1,8 @@
 data/
+raw_data/
+tiles_data/
 utils/pytorch3d
 imgs/
 pc2img/tiles/
 tile.png
+test.py

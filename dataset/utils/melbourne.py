@@ -25,7 +25,7 @@ class LasReader:
     def read_las(self, filename):
         file_dir = os.path.join(self.data_dir, filename)
         
-        with laspy.open(file_dir) as fh:
+        with laspy.open(file_dir, mode='r') as fh:
             print('Points from Header:', fh.header.point_count)
             las = fh.read()
             print('Points from data:', len(las.points))

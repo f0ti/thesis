@@ -1,0 +1,105 @@
+import os
+from torch import Tensor
+import numpy as np
+import ctypes
+import imageio
+from tqdm import tqdm
+from tile import Tile
+from helper import download_and_extract_archive, DATASET_URL
+from typing import Optional, Callable
+from torch.utils.data import Dataset
+from torchvision import transforms
+
+DATASET_DIR = "../tiles_data"
+
+
+class TileDataset(Dataset):
+    def __init__(
+        self,
+        root: str = "melbourne",
+        download: bool = False,
+        image_set: str = "train",
+        transform: Optional[Callable] = None,
+        max_samples: Optional[int] = None,
+    ):
+        super().__init__()
+
+        assert root in ["melbourne"], "Dataset not supported"
+        assert image_set in ["train", "test", "val"]
+
+        self.root = root
+        self.base_dir = DATASET_DIR
+        self.image_set = image_set
+        self.max_samples = max_samples
+
+        self.IMAGE_SHAPE = (256, 256, 3)
+
+        dataset_path = os.path.join(self.base_dir, self.root)
+
+        if download:
+            download_and_extract_archive(DATASET_URL[self.root], self.root)
+
+        if not os.path.isdir(dataset_path):
+            raise RuntimeError(
+                "Dataset not found or corrupted. You can use download=True to download it"
+            )
+        
+        train_path = os.path.join(dataset_path, "train")
+        test_path = os.path.join(dataset_path, "test")
+
+        self.paths = {
+            "train": [],
+            "test": [],
+        }
+
+        self.paths["train"] = list(
+            map(lambda x: os.path.join(train_path, x), os.listdir(train_path))
+        )
+
+        self.paths["test"] = list(
+            map(lambda x: os.path.join(test_path, x), os.listdir(test_path))
+        )
+
+        self.samples = self.paths[image_set]
+        self.num_samples = len(self.samples)
+
+        if self.max_samples:
+            self.num_samples = min(self.max_samples, self.num_samples)
+            self.samples = self.samples[: self.num_samples]
+
+        self.image_data = np.zeros(
+            (self.num_samples,) + self.IMAGE_SHAPE, dtype=ctypes.c_uint16
+        )
+        self.label_data = np.zeros(
+            (self.num_samples,) + self.IMAGE_SHAPE, dtype=ctypes.c_double
+        )
+
+        for idx in tqdm(range(self.num_samples), desc=f"Loading {self.image_set} data"):
+            sample = Tile(self.samples[idx])
+
+            self.image_data[idx] = np.asarray(sample.colors, dtype=ctypes.c_uint16).reshape(sample.width, sample.height, 3)
+            
+            if self.image_set != "test":
+                self.label_data[idx] = np.asarray(sample.xyz, dtype=ctypes.c_double).reshape(sample.width, sample.height, 3)
+            
+    def __len__(self) -> int:
+        return self.num_samples
+
+    def __getitem__(self, index):
+        sample = self.samples[index]
+        image = imageio.imread(sample[0])
+
+        # load transforms
+        transform = transforms.Compose(
+            [
+                transforms.ToTensor(),
+            ]
+        )
+
+        image = transform(image)
+
+        label = None if self.image_set == "test" else Tensor([sample[1]])
+
+        sample = {"image": image, "label": label}
+
+        return sample

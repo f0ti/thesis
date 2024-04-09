@@ -294,9 +294,9 @@ void pointCloud2Images(const char *lasFileName)
             printf("%s \n", currentBinFileName);
             
             BinaryHeader currentHeader;
-            // currentHeader.numberOfPoints = 0;
-            // currentHeader.width = currentImage.nCols;
-            // currentHeader.height = currentImage.nRows;
+            currentHeader.numberOfPoints = 0;
+            currentHeader.width = currentImage.nCols;
+            currentHeader.height = currentImage.nRows;
             
             writeToBinaryFile(currentBinFileName, currentImage.pointsArr, currentHeader);
         }
@@ -320,8 +320,8 @@ void pointCloud2Images(const char *lasFileName)
             
             BinaryHeader currentHeader;
             currentHeader.numberOfPoints = 0;
-            // currentHeader.width = currentImage.nCols;
-            // currentHeader.height = currentImage.nRows;
+            currentHeader.width = currentImage.nCols;
+            currentHeader.height = currentImage.nRows;
             
             writeToBinaryFile(currentBinFileName, currentImage.pointsArr, currentHeader);
             printf("\n");
@@ -331,13 +331,13 @@ void pointCloud2Images(const char *lasFileName)
 
 int main(int argc, const char * argv[]) {
     
-    // char fileName[512];
-    // snprintf(fileName, 512, "Tile_+003_+005.las");
-    // pointCloud2Images(fileName);
+    char fileName[512];
+    snprintf(fileName, 512, "Tile_+003_+005.las");
+    pointCloud2Images(fileName);
 
-    PointsArr arr = readBinaryFile("Tile_+003_+005_0_0");
-    printf("%d\n", arr.numberOfPoints);
-    printf("%f %f %f %u %u %u %d\n", arr.points[0].x, arr.points[0].y, arr.points[0].z, arr.points[0].red, arr.points[0].green, arr.points[0].blue, arr.points[0].isEmpty);
+    // PointsArr arr = readBinaryFile("Tile_+003_+005_0_0");
+    // printf("%d\n", arr.numberOfPoints);
+    // printf("%f %f %f %u %u %u %d\n", arr.points[0].x, arr.points[0].y, arr.points[0].z, arr.points[0].red, arr.points[0].green, arr.points[0].blue, arr.points[0].isEmpty);
 
     return 0;
 }
