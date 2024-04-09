@@ -30,7 +30,7 @@ class Tile:
     def read_points(self):
         with open(self.filename, 'rb') as reader:
             # read header
-            h_data = unpack('ff', reader.read(8))
+            h_data: tuple = unpack('ff', reader.read(8))
             self.width = int(h_data[0])
             self.height = int(h_data[1])
             self.nr_points = int.from_bytes(reader.read(4), byteorder='little')
@@ -58,7 +58,7 @@ class Tile:
         img_name = self.filename.split('/')[-1]
         try:
             img = plt.imread(f"imgs/{img_name}.png")
-        except FileNotFoundError:            
+        except FileNotFoundError:
             img = np.asarray(self.colors, dtype=np.uint8).reshape(self.width, self.height, 3)
         
         plt.imshow(img)

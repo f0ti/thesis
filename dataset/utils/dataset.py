@@ -2,7 +2,6 @@ import os
 from torch import Tensor
 import numpy as np
 import ctypes
-import imageio
 from tqdm import tqdm
 from tile import Tile
 from helper import download_and_extract_archive, DATASET_URL
@@ -67,29 +66,17 @@ class TileDataset(Dataset):
             self.num_samples = min(self.max_samples, self.num_samples)
             self.samples = self.samples[: self.num_samples]
 
-        self.image_data = np.zeros(
-            (self.num_samples,) + self.IMAGE_SHAPE, dtype=ctypes.c_uint16
-        )
-        self.label_data = np.zeros(
-            (self.num_samples,) + self.IMAGE_SHAPE, dtype=ctypes.c_double
-        )
-
-        for idx in tqdm(range(self.num_samples), desc=f"Loading {self.image_set} data"):
-            sample = Tile(self.samples[idx])
-
-            self.image_data[idx] = np.asarray(sample.colors, dtype=ctypes.c_uint16).reshape(sample.width, sample.height, 3)
-            
-            if self.image_set != "test":
-                self.label_data[idx] = np.asarray(sample.xyz, dtype=ctypes.c_double).reshape(sample.width, sample.height, 3)
-            
     def __len__(self) -> int:
         return self.num_samples
 
     def __getitem__(self, index):
-        sample = self.samples[index]
-        image = imageio.imread(sample[0])
 
-        # load transforms
+        sample = Tile(self.samples[index])
+        image = np.asarray(sample.colors, dtype=np.int8).reshape(sample.width, sample.height, 3)
+        
+        if self.image_set != "test":
+            label = np.asarray(sample.xyz, dtype=np.double).reshape(sample.width, sample.height, 3)
+        
         transform = transforms.Compose(
             [
                 transforms.ToTensor(),
@@ -97,8 +84,7 @@ class TileDataset(Dataset):
         )
 
         image = transform(image)
-
-        label = None if self.image_set == "test" else Tensor([sample[1]])
+        label = None if self.image_set == "test" else transform(label)
 
         sample = {"image": image, "label": label}
 
