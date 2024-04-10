@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -64,8 +65,8 @@ class Tile:
         plt.imshow(img)
         plt.show()
 
-    def save(self):
+    def save(self, root):
         img = np.asarray(self.colors, dtype=np.uint8).reshape(self.width, self.height, 3)
         img_name = self.filename.split('/')[-1]
-        plt.imsave(f"imgs/{img_name}.png", img)
-        plt.show()
+        os.makedirs(root, exist_ok=True)
+        plt.imsave(f"{root}/{img_name}.png", img)

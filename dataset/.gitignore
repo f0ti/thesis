@@ -1,6 +1,7 @@
 data/
 raw_data/
 tiles_data/
+image_data/
 utils/pytorch3d
 imgs/
 pc2img/tiles/

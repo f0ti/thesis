@@ -30,6 +30,7 @@ class TileDataset(Dataset):
         self.base_dir = DATASET_DIR
         self.image_set = image_set
         self.max_samples = max_samples
+        self.transform = transform
 
         self.IMAGE_SHAPE = (256, 256, 3)
 
@@ -76,16 +77,13 @@ class TileDataset(Dataset):
         
         if self.image_set != "test":
             label = np.asarray(sample.xyz, dtype=np.double).reshape(sample.width, sample.height, 3)
-        
-        transform = transforms.Compose(
-            [
-                transforms.ToTensor(),
-            ]
-        )
 
-        image = transform(image)
-        label = None if self.image_set == "test" else transform(label)
+        if self.transform:
+            image = self.transform(image)
+            label = self.transform(label)
 
-        sample = {"image": image, "label": label}
+        if self.image_set == "train":
+            return (image, label)
 
-        return sample
+        else:
+            return (image,)
