@@ -65,8 +65,12 @@ class Tile:
         plt.imshow(img)
         plt.show()
 
-    def save(self, root):
+    def save_rgb(self, root):
         img = np.asarray(self.colors, dtype=np.uint8).reshape(self.width, self.height, 3)
         img_name = self.filename.split('/')[-1]
-        os.makedirs(root, exist_ok=True)
         plt.imsave(f"{root}/{img_name}.png", img)
+
+    def save_xyz(self, root):
+        xyz = np.asarray(self.xyz, dtype=np.double).reshape(self.width, self.height, 3)
+        xyz_name = self.filename.split('/')[-1]
+        np.savez_compressed(f"{root}/{xyz_name}.npz", xyz)
