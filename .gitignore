@@ -1,10 +1,6 @@
 obsidian/aerial/daily-notes
 obsidian/.obsidian
-dataset/data/
-pkgs/
-simulation/
 experiments/
-models/
 *.pdf
 __pycache__/
 .vscode/
