@@ -1,4 +1,0 @@
-# pack-refs with: peeled fully-peeled sorted 
-b62183747c14b1242286037871e5621544e27fb1 refs/heads/dev
-c3268edd50ec37a81600c9b981841f48929671b8 refs/heads/master
-3ca3b0d5eff0c96a309b978500cb7bba9c2be31e refs/heads/pytorch0.3.1
