@@ -7,6 +7,7 @@ from typing import Union
 # inspired by: https://github.com/pytorch/vision/blob/main/torchvision/datasets/folder.py
 
 DATASET_PATH = "../../dataset"
+DATASET_TARGET = "data/melbourne"
 
 
 def validate_dataset(dataset_path: str) -> bool:
@@ -29,15 +30,12 @@ def make_dataset(dataset_root: Union[str, Path] = DATASET_PATH, dataset_name: st
     
     assert validate_dataset(dataset_path), "Required dirs are missing. Please refer to the documentation."
 
-    # for image_set in ["train", "test"]:
-    #     image_set_path = os.path.join(dataset_path, image_set)
-    #     if not os.path.exists(image_set_path):
-    #         os.makedirs(image_set_path)
-    #     for sample in dataset.paths[image_set]:
-    #         sample_name = os.path.basename(sample)
-    #         sample_path = os.path.join(image_set_path, sample_name)
-    #         if not os.path.exists(sample_path):
-    #             shutil.copy(sample, sample_path)
+    for d in ["A", "B"]:
+        for split in ["train", "test"]:
+            print(f"Copying {d} {split} data")
+            os.makedirs(os.path.join(DATASET_TARGET, d, split), exist_ok=True)
 
+            src = "rgb_data" if d == "A" else "xyz_data"
+            shutil.copytree(os.path.join(dataset_path, src, split), os.path.join(DATASET_TARGET, d, split), dirs_exist_ok=True)
 
 make_dataset()

@@ -62,21 +62,3 @@ def _urlretrieve(url: str, filename: str, chunk_size: int = 1024 * 32) -> None:
             filename,
             length=response.length,
         )
-
-
-def generate_all_classes() -> None:
-    dataset_path = "data/tiny-imagenet-200"
-    words_path = os.path.join(dataset_path, "words.txt")
-
-    wnid_to_word = []
-    with open(words_path, "r") as wp:
-        for line in wp:
-            wnid, str_labels = line.split("\t")
-            wnid_to_word.append({"wnid": wnid, "labels": str_labels.strip()})
-
-    with open("classes.json", "w") as outfile:
-        json.dump(wnid_to_word, outfile)
-
-
-def get_class_label(class_index: int) -> str:
-    return CLASS_LABELS[class_index]["labels"]

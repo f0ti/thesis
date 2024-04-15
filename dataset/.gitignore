@@ -1,5 +1,6 @@
 melbourne/
 imgs/
+PointCloud2Image
 pc2img/tiles/
 tile.png
 test.py
