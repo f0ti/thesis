@@ -2,6 +2,11 @@
 
 set -ex
 
+if [ "$#" -ne 1 ]; then
+    echo "Usage: $0 <split_percentage>"
+    exit 1
+fi
+
 data_dir="raw_data"
 target_dir="tiles_data"
 las_dir="las_data"
@@ -18,13 +23,8 @@ mkdir -p $las_dir
 find $data_dir -maxdepth 4 -type f -name '*' -exec mv {} $target_dir \;
 find $target_dir -maxdepth 4 -type f -name '*.las' -exec mv {} $las_dir \;
 
-if [ "$#" -ne 1 ]; then
-    echo "Usage: $0 <split_percentage>"
-    exit 1
-else
-    split_percentage=$1
-    echo "Splitting data with $split_percentage for training."
-fi
+split_percentage=$1
+echo "Splitting data with $split_percentage for training."
 
 total_files=$(find $target_dir -maxdepth 1 -type f | wc -l)
 echo "Total files: $total_files"
