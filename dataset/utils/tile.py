@@ -5,6 +5,8 @@ from tqdm import tqdm
 from struct import unpack
 from point import Point
 
+DEBUG = False
+
 class Tile:
     
     def __init__(self, filename) -> None:
@@ -36,7 +38,7 @@ class Tile:
             self.height = int(h_data[1])
             self.nr_points = int.from_bytes(reader.read(4), byteorder='little')
 
-            for _ in tqdm(range(self.nr_points)):
+            for _ in tqdm(range(self.nr_points), disable=not DEBUG):
                 data = unpack('<dddHHHBI?', reader.read(36))
 
                 x = data[0]
@@ -52,7 +54,8 @@ class Tile:
                 point = Point(x, y, z, r, g, b, intensity, point_id, bool)
                 self.points.append(point)
 
-            print(f"Read {self.nr_points} points from {self.filename}")
+            if DEBUG:
+                print(f"Read {self.nr_points} points from {self.filename}")
 
     def show(self):
         # search if tile name exists in imgs folder
@@ -73,4 +76,4 @@ class Tile:
     def save_xyz(self, root):
         xyz = np.asarray(self.xyz, dtype=np.double).reshape(self.width, self.height, 3)
         xyz_name = self.filename.split('/')[-1]
-        np.savez_compressed(f"{root}/{xyz_name}.npz", xyz)
+        np.save(f"{root}/{xyz_name}.npy", xyz)

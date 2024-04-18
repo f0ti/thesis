@@ -40,15 +40,11 @@ class TileDataset(Dataset):
     def __getitem__(self, index):
         image_path = os.path.join(self.rgb_path, self.rgb_samples[index])
         label_path = os.path.join(self.xyz_path, self.xyz_samples[index])
-        
-        assert image_path.endswith(".png"), "Image path must end with .png"
-        assert label_path.endswith(".npz"), "Label path must end with .npz"
 
         image = Image.open(image_path)
         label = np.load(label_path)
-        print(type(label))
 
-        image = transforms.ToTensor()(image)
+        image = transforms.ToTensor()(image)[:3, :, :]
         label = transforms.ToTensor()(label)
 
         if self.image_set == "train":
@@ -57,9 +53,7 @@ class TileDataset(Dataset):
             return image
 
 train_dataset = TileDataset(dataset="melbourne", image_set="train", max_samples=10)
-train_dataloader = DataLoader(train_dataset, batch_size=10, shuffle=True)
+train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True)
 
-print(next(iter(train_dataloader))[0].shape)
-print(next(iter(train_dataloader))[1].shape)
-
-print(len(train_dataloader))
+print(next(iter(train_dataloader))[0])
+print(next(iter(train_dataloader))[1])

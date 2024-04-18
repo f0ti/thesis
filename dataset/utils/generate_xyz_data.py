@@ -1,5 +1,6 @@
 import os
 import click
+from tqdm import tqdm
 from tile import Tile
 
 @click.command()
@@ -16,8 +17,11 @@ def generate_xyz_data(mode):
     
     paths = os.listdir(base_dir)
 
-    for path in paths:
-        tile = Tile(os.path.join(base_dir, path))
+    for path in tqdm(paths):
+        file_dir = os.path.join(base_dir, path)
+        if os.stat(file_dir).st_size < 100:
+            continue
+        tile = Tile(file_dir)
         tile.save_xyz(save_dir)
 
 if __name__ == "__main__":
