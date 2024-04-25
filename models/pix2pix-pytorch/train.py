@@ -48,8 +48,8 @@ if opt.cuda:
 
 print('===> Loading datasets')
 root_path = "dataset/"
-train_set = get_training_set(root_path + opt.dataset, opt.direction)
-test_set = get_test_set(root_path + opt.dataset, opt.direction)
+train_set = get_training_set(opt.dataset)
+test_set = get_test_set(opt.dataset)
 training_data_loader = DataLoader(dataset=train_set, num_workers=opt.threads, batch_size=opt.batch_size, shuffle=True)
 testing_data_loader = DataLoader(dataset=test_set, num_workers=opt.threads, batch_size=opt.test_batch_size, shuffle=False)
 

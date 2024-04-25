@@ -7,6 +7,7 @@ from torchvision import transforms
 from config import *
 from PIL import Image
 
+
 class TileDataset(Dataset):
     def __init__(
         self,
@@ -17,6 +18,7 @@ class TileDataset(Dataset):
     ):
         super().__init__()
 
+        print(dataset)
         assert dataset in ["melbourne"], "Dataset not supported"
         assert image_set in ["train", "test", "val"]
 
@@ -42,7 +44,7 @@ class TileDataset(Dataset):
         label_path = os.path.join(self.xyz_path, self.xyz_samples[index])
 
         image = Image.open(image_path)
-        label = np.load(label_path)
+        label = np.load(label_path).astype(np.float32)
 
         image = transforms.ToTensor()(image)[:3, :, :]
         label = transforms.ToTensor()(label)

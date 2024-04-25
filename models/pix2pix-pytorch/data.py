@@ -1,15 +1,9 @@
 from os.path import join
-
-from dataset import DatasetFromFolder
-
-
-def get_training_set(root_dir, direction):
-    train_dir = join(root_dir, "train")
-
-    return DatasetFromFolder(train_dir, direction)
+from dataset import TileDataset
 
 
-def get_test_set(root_dir, direction):
-    test_dir = join(root_dir, "test")
+def get_training_set(dataset):
+    return TileDataset(dataset=dataset, image_set="train")
 
-    return DatasetFromFolder(test_dir, direction)
+def get_test_set(dataset):
+    return TileDataset(dataset=dataset, image_set="test")
