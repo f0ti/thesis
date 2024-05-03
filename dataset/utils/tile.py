@@ -37,9 +37,10 @@ class Tile:
             self.width = int(h_data[0])
             self.height = int(h_data[1])
             self.nr_points = int.from_bytes(reader.read(4), byteorder='little')
+            print(self.width, self.height, self.nr_points)
 
             for _ in tqdm(range(self.nr_points), disable=not DEBUG):
-                data = unpack('<dddHHHBI?', reader.read(36))
+                data = unpack('<dddBBBBQ?', reader.read(37))
 
                 x = data[0]
                 y = data[1]
@@ -50,7 +51,8 @@ class Tile:
                 intensity = data[6]
                 point_id = data[7]
                 bool = data[8]
-
+                
+                print(x, y, z)
                 point = Point(x, y, z, r, g, b, intensity, point_id, bool)
                 self.points.append(point)
 

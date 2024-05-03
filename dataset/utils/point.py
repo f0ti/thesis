@@ -23,4 +23,4 @@ class Point:
         self.isEmpty = isEmpty
 
     def __repr__(self) -> str:
-        return f"({self.pointId}, {self.X}, {self.Y}, {self.Z}), ({self.R}, {self.G}, {self.B}), {self.intensity}, {self.isEmpty}"
+        return f"{self.pointId}, ({self.X}, {self.Y}, {self.Z}), ({self.R}, {self.G}, {self.B}), {self.intensity}, {self.isEmpty}"

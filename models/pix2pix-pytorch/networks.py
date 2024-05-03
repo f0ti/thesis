@@ -336,6 +336,7 @@ class GANLoss(nn.Module):
             target_tensor = self.real_label
         else:
             target_tensor = self.fake_label
+        # same as torch.zero_like(input)
         return target_tensor.expand_as(input)
 
     def __call__(self, input, target_is_real):

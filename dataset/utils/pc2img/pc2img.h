@@ -89,12 +89,12 @@ typedef struct __attribute__((__packed__))
 
 typedef struct __attribute__((__packed__))
 {   
-    double       x;
-    double       y;
-    double       z;
-    uint16_t    red;
-    uint16_t    green;
-    uint16_t    blue;
+    double      x;
+    double      y;
+    double      z;
+    uint8_t     red;
+    uint8_t     green;
+    uint8_t     blue;
     uint8_t     intensity;
     uint32_t    pointId;
     bool        isEmpty;

@@ -10,7 +10,7 @@ def generate_xyz_data(mode):
     assert mode in ['train', 'test']
 
     base_dir = f"../melbourne/tiles_data/{mode}"
-    save_dir = f"../melbourne/xyz_data/{mode}"
+    save_dir = f"../melbourne/xyz_data_experiment/{mode}"
     
     os.makedirs(base_dir, exist_ok=True)
     os.makedirs(save_dir, exist_ok=True)

@@ -18,7 +18,6 @@ class TileDataset(Dataset):
     ):
         super().__init__()
 
-        print(dataset)
         assert dataset in ["melbourne"], "Dataset not supported"
         assert image_set in ["train", "test", "val"]
 
@@ -57,5 +56,5 @@ class TileDataset(Dataset):
 train_dataset = TileDataset(dataset="melbourne", image_set="train", max_samples=10)
 train_dataloader = DataLoader(train_dataset, batch_size=1, shuffle=True)
 
-print(next(iter(train_dataloader))[0])
-print(next(iter(train_dataloader))[1])
+print(next(iter(train_dataloader))[0][0][0][0])
+print(next(iter(train_dataloader))[1][0][0][0])

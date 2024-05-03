@@ -2,11 +2,12 @@ from __future__ import print_function
 import argparse
 import os
 from math import log10
-
+import wandb
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
+from utils import read_config_from_file
 import torch.backends.cudnn as cudnn
 
 from networks import define_G, define_D, GANLoss, get_scheduler, update_learning_rate
@@ -35,7 +36,7 @@ parser.add_argument('--seed', type=int, default=123, help='random seed to use. D
 parser.add_argument('--lamb', type=int, default=10, help='weight on L1 term in objective')
 opt = parser.parse_args()
 
-print(opt)
+wandb.init(project="pix2pix-pytorch-implementation", config=opt)
 
 if opt.cuda and not torch.cuda.is_available():
     raise Exception("No GPU found, please run without --cuda")
@@ -46,7 +47,7 @@ torch.manual_seed(opt.seed)
 if opt.cuda:
     torch.cuda.manual_seed(opt.seed)
 
-print('===> Loading datasets')
+print('Loading datasets...')
 root_path = "dataset/"
 train_set = get_training_set(opt.dataset)
 test_set = get_test_set(opt.dataset)
@@ -55,7 +56,7 @@ testing_data_loader = DataLoader(dataset=test_set, num_workers=opt.threads, batc
 
 device = torch.device("cuda:0" if opt.cuda else "cpu")
 
-print('===> Building models')
+print('Building models...')
 net_g = define_G(opt.input_nc, opt.output_nc, opt.ngf, 'batch', False, 'normal', 0.02, gpu_id=device)
 net_d = define_D(opt.input_nc + opt.output_nc, opt.ndf, 'basic', gpu_id=device)
 
@@ -84,7 +85,7 @@ for epoch in range(opt.epoch_count, opt.niter + opt.niter_decay + 1):
         
         # train with fake
         fake_ab = torch.cat((real_a, fake_b), 1)
-        pred_fake = net_d.forward(fake_ab.detach())
+        pred_fake = net_d.forward(fake_ab.detach())  # what generator outputs
         loss_d_fake = criterionGAN(pred_fake, False)
 
         # train with real
@@ -111,15 +112,18 @@ for epoch in range(opt.epoch_count, opt.niter + opt.niter_decay + 1):
         loss_g_gan = criterionGAN(pred_fake, True)
 
         # Second, G(A) = B
-        loss_g_l1 = criterionL1(fake_b, real_b) * opt.lamb
-        
+        loss_g_l1 = criterionL1(fake_b, real_b)
+        print(loss_g_l1.item())
+
         loss_g = loss_g_gan + loss_g_l1
         
         loss_g.backward()
 
         optimizer_g.step()
 
-        print("===> Epoch[{}]({}/{}): Loss_D: {:.4f} Loss_G: {:.4f}".format(
+        wandb.log({"Loss_D": loss_d.item(), "Loss_G": loss_g.item()})
+
+        print("Epoch[{}]({}/{}): Loss_D: {:.4f} Loss_G: {:.4f}".format(
             epoch, iteration, len(training_data_loader), loss_d.item(), loss_g.item()))
 
     update_learning_rate(net_g_scheduler, optimizer_g)
@@ -134,7 +138,7 @@ for epoch in range(opt.epoch_count, opt.niter + opt.niter_decay + 1):
         mse = criterionMSE(prediction, target)
         psnr = 10 * log10(1 / mse.item())
         avg_psnr += psnr
-    print("===> Avg. PSNR: {:.4f} dB".format(avg_psnr / len(testing_data_loader)))
+    print("Avg. PSNR: {:.4f} dB".format(avg_psnr / len(testing_data_loader)))
 
     #checkpoint
     if epoch % 50 == 0:

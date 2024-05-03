@@ -332,12 +332,17 @@ void pointCloud2Images(const char *lasFileName)
 int main(int argc, const char * argv[]) {
     
     char fileName[512];
-    snprintf(fileName, 512, "Tile_+003_+005.las");
-    pointCloud2Images(fileName);
+    snprintf(fileName, 512, "/home/foti/aerial/thesis/dataset/melbourne/LasFiles_30-04-2024/LasFiles/Tile_+005_+017/Tile_+005_+017/Tile_+005_+017_0_0");
+    // pointCloud2Images(fileName);
 
-    // PointsArr arr = readBinaryFile("Tile_+003_+005_0_0");
-    // printf("%d\n", arr.numberOfPoints);
-    // printf("%f %f %f %u %u %u %d\n", arr.points[0].x, arr.points[0].y, arr.points[0].z, arr.points[0].red, arr.points[0].green, arr.points[0].blue, arr.points[0].isEmpty);
-
+    int idx = 10;
+    PointsArr arr = readBinaryFile(fileName);
+    printf("%d\n", arr.numberOfPoints);
+    printf("%f %f %f %u %u %u %u %u %d\n",
+        arr.points[idx].x, arr.points[idx].y, arr.points[idx].z,
+        arr.points[idx].red, arr.points[idx].green, arr.points[idx].blue,
+        arr.points[idx].intensity, arr.points[idx].pointId, arr.points[idx].isEmpty
+    );
+    
     return 0;
 }
