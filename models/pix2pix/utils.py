@@ -7,7 +7,7 @@ def is_image_file(filename):
 
 
 def load_img(filepath):
-    img = Image.open(filepath).convert('RGB')
+    img = Image.open(filepath).convert("RGB")
     img = img.resize((256, 256), Image.BICUBIC)
     return img
 
@@ -21,16 +21,17 @@ def save_img(image_tensor, filename):
     image_pil.save(filename)
     print("Image saved as {}".format(filename))
 
+
 def read_config_from_file(file_path="config.py"):
     cfg = {}
-    with open(file_path, 'r') as file:
+    with open(file_path, "r") as file:
         for line in file:
             line = line.strip()
             # skip empty lines and comments
-            if not line or line.startswith('#'):
+            if not line or line.startswith("#"):
                 continue
-            key, value = line.split('=', 1)
+            key, value = line.split("=", 1)
             key, value = key.strip().lower(), value.strip()
             cfg[key] = value
-    
+
     return cfg

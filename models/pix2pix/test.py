@@ -8,11 +8,13 @@ import torchvision.transforms as transforms
 from utils import is_image_file, load_img, save_img
 
 # Testing settings
-parser = argparse.ArgumentParser(description='pix2pix-pytorch-implementation')
-parser.add_argument('--dataset', required=True, help='facades')
-parser.add_argument('--direction', type=str, default='b2a', help='a2b or b2a')
-parser.add_argument('--nepochs', type=int, default=200, help='saved model of which epochs')
-parser.add_argument('--cuda', action='store_true', help='use cuda')
+parser = argparse.ArgumentParser(description="pix2pix-pytorch-implementation")
+parser.add_argument("--dataset", required=True, help="facades")
+parser.add_argument("--direction", type=str, default="b2a", help="a2b or b2a")
+parser.add_argument(
+    "--nepochs", type=int, default=200, help="saved model of which epochs"
+)
+parser.add_argument("--cuda", action="store_true", help="use cuda")
 opt = parser.parse_args()
 print(opt)
 
@@ -29,8 +31,10 @@ else:
 
 image_filenames = [x for x in os.listdir(image_dir) if is_image_file(x)]
 
-transform_list = [transforms.ToTensor(),
-                  transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))]
+transform_list = [
+    transforms.ToTensor(),
+    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+]
 
 transform = transforms.Compose(transform_list)
 

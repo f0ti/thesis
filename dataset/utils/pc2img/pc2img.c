@@ -332,10 +332,10 @@ void pointCloud2Images(const char *lasFileName)
 int main(int argc, const char * argv[]) {
     
     char fileName[512];
-    snprintf(fileName, 512, "/home/foti/aerial/thesis/dataset/melbourne/LasFiles_30-04-2024/LasFiles/Tile_+005_+017/Tile_+005_+017/Tile_+005_+017_0_0");
+    snprintf(fileName, 512, "/home/foti/aerial/thesis/dataset/melbourne/tiles_data/train/Tile_+020_+012_3_0");
     // pointCloud2Images(fileName);
 
-    int idx = 10;
+    int idx = 0;
     PointsArr arr = readBinaryFile(fileName);
     printf("%d\n", arr.numberOfPoints);
     printf("%f %f %f %u %u %u %u %u %d\n",

@@ -2,7 +2,7 @@
 
 set -ex
 
-zip_file="LasFiles_30-04-2024.zip"
+zip_file="LasFiles_Normalized_15052024.zip"
 
 if [ "$#" -ne 1 ]; then
     echo "Usage: $0 <split_percentage>"
@@ -16,7 +16,7 @@ las_dir="las_data"
 mkdir -p $data_dir
 cp $zip_file $data_dir
 unzip $data_dir/$zip_file -x '*/__MACOSX/*' -d $data_dir
-rm $data_dir/$zip_file
+# rm $data_dir/$zip_file
 
 mkdir -p $target_dir
 mkdir -p $las_dir

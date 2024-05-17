@@ -1,7 +1,7 @@
 ## Motivation
 Image-to-image translation is a class of vision and graphics problems where the goal is to learn the mapping between an input image and an output image using a training set of aligned image pairs. For many tasks the paired training data will not be available.
 The goal is to translate an image from a source domain X to a target domain Y in the absence of these paired examples, such that the distribution of images from $G(x)$ is indistinguishable from the distribution Y using an adversarial loss.
-
+''
 This paper introduces an inverse mapping $F: Y \rightarrow x$  and a cycle consistency loss.
 ## Approach
 Capturing special characteristics of one image collection and figuring out how these characteristics could be translated into the other image collection, all in the absence of any paired training examples.
