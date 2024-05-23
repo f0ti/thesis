@@ -33,8 +33,8 @@ class DMTTileDataset(Dataset):
         self.rgb_path = os.path.join(dataset_path, "A", image_set)
         self.xyz_path = os.path.join(dataset_path, "B", image_set)
 
-        self.rgb_samples = os.listdir(self.rgb_path)
-        self.xyz_samples = os.listdir(self.xyz_path)
+        self.rgb_samples = os.listdir(self.rgb_path)[:500]
+        self.xyz_samples = os.listdir(self.xyz_path)[:500]
 
     def __len__(self) -> int:
         return len(self.rgb_samples)
@@ -50,6 +50,8 @@ class DMTTileDataset(Dataset):
         image = transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))
         label = transforms.ToTensor()(label)
         image = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+
+        assert self.rgb_samples[index].split(".")[0] == self.xyz_samples[index].split(".")[0]
 
         if self.image_set == "train":
             return image, label
@@ -81,8 +83,10 @@ class RGBTileDataset(Dataset):
         self.rgb_path = os.path.join(dataset_path, "A", image_set)
         self.xyz_path = os.path.join(dataset_path, "B", image_set)
 
-        self.rgb_samples = os.listdir(self.rgb_path)
-        self.xyz_samples = os.listdir(self.xyz_path)
+        self.rgb_samples = sorted(os.listdir(self.rgb_path))
+        self.xyz_samples = sorted(os.listdir(self.xyz_path))
+
+        assert len(self.rgb_samples) == len(self.xyz_samples), "Number of samples in RGB and XYZ folders do not match"
 
         self.input_transforms = v2.Compose(
             [
@@ -94,8 +98,7 @@ class RGBTileDataset(Dataset):
         self.label_transforms = v2.Compose(
             [
                 v2.ToTensor(),
-                v2.ToDtype(torch.float32, scale=True),
-                v2.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+                # v2.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
             ]
         )
 
