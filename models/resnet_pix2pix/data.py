@@ -83,22 +83,22 @@ class RGBTileDataset(Dataset):
         self.rgb_path = os.path.join(dataset_path, "A", image_set)
         self.xyz_path = os.path.join(dataset_path, "B", image_set)
 
-        self.rgb_samples = sorted(os.listdir(self.rgb_path))
-        self.xyz_samples = sorted(os.listdir(self.xyz_path))
+        self.rgb_samples = sorted(os.listdir(self.rgb_path))[:max_samples]
+        self.xyz_samples = sorted(os.listdir(self.xyz_path))[:max_samples]
 
         assert len(self.rgb_samples) == len(self.xyz_samples), "Number of samples in RGB and XYZ folders do not match"
 
         self.input_transforms = v2.Compose(
             [
                 v2.ToTensor(),
-                v2.ToDtype(torch.float32, scale=True),
+                v2.ToDtype(torch.float32),
             ]
         )
 
         self.label_transforms = v2.Compose(
             [
                 v2.ToTensor(),
-                # v2.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
+                v2.ToDtype(torch.float32),
             ]
         )
 

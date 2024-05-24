@@ -1,23 +1,33 @@
-from __future__ import print_function
 import argparse
-from cgi import test
 import os
-from turtle import pos
+import sys
 import wandb
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader
 import torch.backends.cudnn as cudnn
 from math import log10
 from tqdm import tqdm
-from networks import define_G, define_D, GANLoss, get_scheduler, update_learning_rate
 from data import RGBTileDataset
+from torch.utils.data import DataLoader
+import matplotlib.pyplot as plt
+import numpy as np
+from networks import define_G, define_D, GANLoss, get_scheduler, update_learning_rate
+
+def show_images(images, cols=4, figsize=(20, 20)):
+    rows = len(images) // cols
+    fig, axs = plt.subplots(rows, cols, figsize=figsize)
+    for i, ax in enumerate(axs.flat):
+        # Transpose the image from (3, 256, 256) to (256, 256, 3)
+        img = images[i].astype(np.uint8)
+        ax.imshow(img)
+        ax.axis('off')
+    plt.show()
 
 # Training settings
 parser = argparse.ArgumentParser(description='pix2pix-pytorch-implementation')
-parser.add_argument('--dataset', required=True, help='facades')
-parser.add_argument('--batch_size', type=int, default=4, help='training batch size')
+parser.add_argument('--dataset', required=True, help='melbourne/facades')
+parser.add_argument('--batch_size', type=int, default=16, help='training batch size')
 parser.add_argument('--test_batch_size', type=int, default=1, help='testing batch size')
 parser.add_argument('--direction', type=str, default='b2a', help='a2b or b2a')
 parser.add_argument('--input_nc', type=int, default=3, help='input image channels')
@@ -32,12 +42,14 @@ parser.add_argument('--lr_policy', type=str, default='lambda', help='learning ra
 parser.add_argument('--lr_decay_iters', type=int, default=50, help='multiply by a gamma every lr_decay_iters steps')
 parser.add_argument('--beta1', type=float, default=0.5, help='beta1 for adam. default=0.5')
 parser.add_argument('--cuda', action='store_true', help='use cuda?')
-parser.add_argument('--threads', type=int, default=4, help='number of threads for data loader to use')
+parser.add_argument('--threads', type=int, default=1, help='number of threads for data loader to use')
 parser.add_argument('--seed', type=int, default=123, help='random seed to use. Default=123')
 parser.add_argument('--lamb', type=int, default=10, help='weight on L1 term in objective')
+parser.add_argument('--wandb', type=int, default=1, help='weights and biases')
 opt = parser.parse_args()
 
-wandb.init(project="pix2pix-pytorch-implementation", config=vars(opt))
+if opt.wandb:
+    wandb.init(project="pix2pix-pytorch-implementation", config=vars(opt))
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 cudnn.benchmark = True
@@ -66,13 +78,8 @@ optimizer_d = optim.Adam(net_d.parameters(), lr=opt.lr, betas=(opt.beta1, 0.999)
 net_g_scheduler = get_scheduler(optimizer_g, opt)
 net_d_scheduler = get_scheduler(optimizer_d, opt)
 
-for epoch in tqdm(range(opt.epochs)):
-    for step, batch in tqdm(enumerate(train_dl),
-                                desc="Epoch {}".format(epoch),
-                                position=1,
-                                leave=True,
-                                total=len(list(train_dl))
-                            ):
+for epoch in range(opt.epochs):
+    for i, batch in enumerate(train_dl):
         # forward
         real_a, real_b = batch[0].to(device), batch[1].to(device)
         fake_b = net_g(real_a)
@@ -112,10 +119,20 @@ for epoch in tqdm(range(opt.epochs)):
 
         optimizer_g.step()
 
-        wandb.log({"Loss_D": loss_d.item(), "Loss_G": loss_g.item()})
+        if opt.wandb:
+            wandb.log({"Loss_D": loss_d.item(), "Loss_G": loss_g.item()})
 
-        print("Epoch[{}]({}/{}): Loss_D: {:.4f} Loss_G: {:.4f}".format(
-            epoch, step, len(list(train_dl)), loss_d.item(), loss_g.item()))
+        sys.stdout.write(
+            "\r[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f]"
+            % (
+                epoch,
+                opt.n_epochs,
+                i,
+                len(train_dl),
+                loss_d.item(),
+                loss_g.item()
+            )
+        )
 
     update_learning_rate(net_g_scheduler, optimizer_g)
     update_learning_rate(net_d_scheduler, optimizer_d)
