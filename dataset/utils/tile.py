@@ -81,7 +81,7 @@ class Tile:
     def save_rgb(self, root) -> None:
         img = np.asarray(self.colors, dtype=np.uint8).reshape(self.width, self.height, 3)
         img_name = self.filename.split('/')[-1]
-        plt.imsave(f"{root}/{img_name}.png", img)
+        np.save(f"{root}/{img_name}.npy", img)
 
     def save_dtm(self, root) -> None:
         Z = np.asarray(self.Z, dtype=np.float64).reshape(self.width, self.height, 1)
@@ -90,6 +90,6 @@ class Tile:
         np.save(f"{root}/{dtm_name}.npy", Z)
 
     def save_xyz(self, root) -> None:
-        xyz = np.asarray(self.xyz, dtype=np.double).reshape(self.width, self.height, 3)
+        xyz = np.asarray(self.xyz, dtype=np.float32).reshape(self.width, self.height, 3)
         xyz_name = self.filename.split('/')[-1]
         np.save(f"{root}/{xyz_name}.npy", xyz)

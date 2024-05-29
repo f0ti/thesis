@@ -1,8 +1,6 @@
 import argparse
 import os
 import numpy as np
-import math
-import itertools
 import time
 import datetime
 import sys
@@ -30,8 +28,7 @@ def show_rgb(images, cols=4, figsize=(20, 20)):
     rows = len(images) // cols
     fig, axs = plt.subplots(rows, cols, figsize=figsize)
     for i, ax in enumerate(axs.flat):
-        # Transpose the image from (3, 256, 256) to (256, 256, 3)
-        img = images[i].astype(np.uint8)
+        img = images[i]
         img = img.transpose((1, 2, 0))
         ax.imshow(img)
         ax.axis('off')
@@ -43,16 +40,15 @@ def show_xyz(images, cols=4, figsize=(20, 20)):
     for i, ax in enumerate(axs.flat):
         # show only Z channel
         img = images[i]
-        print(img[2])
         ax.imshow(img[2])
         ax.axis('off')
     plt.show()
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--epoch", type=int, default=0, help="epoch to start training from")
-parser.add_argument("--n_epochs", type=int, default=1, help="number of epochs of training")
+parser.add_argument("--n_epochs", type=int, default=10, help="number of epochs of training")
 parser.add_argument("--dataset_name", type=str, default="melbourne", help="name of the dataset")
-parser.add_argument("--batch_size", type=int, default=32, help="size of the batches")
+parser.add_argument("--batch_size", type=int, default=16, help="size of the batches")
 parser.add_argument("--lr", type=float, default=0.0002, help="adam: learning rate")
 parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")
 parser.add_argument("--b2", type=float, default=0.999, help="adam: decay of first order momentum of gradient")
@@ -61,10 +57,8 @@ parser.add_argument("--threads", type=int, default=8, help="number of cpu thread
 parser.add_argument("--img_height", type=int, default=256, help="size of image height")
 parser.add_argument("--img_width", type=int, default=256, help="size of image width")
 parser.add_argument("--channels", type=int, default=3, help="number of image channels")
-parser.add_argument(
-    "--sample_interval", type=int, default=500, help="interval between sampling of images from generators"
-)
-parser.add_argument("--checkpoint_interval", type=int, default=-1, help="interval between model checkpoints")
+parser.add_argument("--sample_interval", type=int, default=500, help="interval between sampling of images from generators")
+parser.add_argument("--checkpoint_interval", type=int, default=5, help="interval between model checkpoints")
 parser.add_argument("--wb", type=int, default=1, help="weights and biases")
 
 opt = parser.parse_args()
@@ -143,8 +137,8 @@ prev_time = time.time()
 for epoch in range(opt.epoch, opt.n_epochs):
     for i, batch in enumerate(train_dl):
         
-        show_xyz(batch["A"].numpy(), cols=4)
-        show_rgb(batch["B"].numpy(), cols=4)
+        # show_xyz(batch["A"].numpy(), cols=4)
+        # show_rgb(batch["B"].numpy(), cols=4)
         
         # Model inputs
         real_A = Variable(batch["B"].type(Tensor))

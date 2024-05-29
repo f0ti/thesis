@@ -1,11 +1,12 @@
 import numpy as np
 from tile import Tile
 
-# filename = "Tile_+020_+013_4_0_ov.npy"
-# file_dir = f"../melbourne/xyz_data_experiment/test/{filename}"
-# tile_dir = "/home/foti/aerial/thesis/dataset/melbourne/LasFiles_30-04-2024/LasFiles/Tile_+005_+017/Tile_+005_+017/Tile_+005_+017_0_0_ov"
+input_path = "/home/foti/aerial/thesis/dataset/melbourne/xyz_data/test/Tile_+003_+005_0_3_ov.npy"
+label_path = "/home/foti/aerial/thesis/dataset/melbourne/rgb_data/test/Tile_+003_+005_0_3_ov.npy"
+input = np.load(input_path)
+label = np.load(label_path)
 
-tile_dir = "/home/foti/aerial/thesis/dataset/melbourne/tiles_data/train/Tile_+020_+012_3_0"
-tile = Tile(tile_dir)
-# tile_xyz = np.load(file_dir)
-print(tile.xyz[0])
+print(input.shape)
+print(label.shape)
+print(input.dtype)
+print(label.dtype)

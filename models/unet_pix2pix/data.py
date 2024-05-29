@@ -59,7 +59,7 @@ class RGBTileDataset(Dataset):
         label_path = os.path.join(self.rgb_path, self.rgb_samples[index])
 
         input = np.load(input_path)
-        label = Image.open(label_path).convert("RGB")
+        label = np.load(label_path)
 
         input = self.input_transforms(input)
         label = self.label_transforms(label)
