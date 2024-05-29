@@ -5,44 +5,12 @@ import time
 import datetime
 import sys
 import wandb
-import matplotlib.pyplot as plt
-import torchvision.transforms as transforms
-from torchvision.utils import save_image
-
+import torch
 from torch.utils.data import DataLoader
-from torchvision import datasets
 from torch.autograd import Variable
-
 from model import *
 from data import *
-
-import torch.nn as nn
-import torch.nn.functional as F
-import torch
-
-# ----------------
-# Debug functions
-# ----------------
-
-def show_rgb(images, cols=4, figsize=(20, 20)):
-    rows = len(images) // cols
-    fig, axs = plt.subplots(rows, cols, figsize=figsize)
-    for i, ax in enumerate(axs.flat):
-        img = images[i]
-        img = img.transpose((1, 2, 0))
-        ax.imshow(img)
-        ax.axis('off')
-    plt.show()
-
-def show_xyz(images, cols=4, figsize=(20, 20)):
-    rows = len(images) // cols
-    fig, axs = plt.subplots(rows, cols, figsize=figsize)
-    for i, ax in enumerate(axs.flat):
-        # show only Z channel
-        img = images[i]
-        ax.imshow(img[2])
-        ax.axis('off')
-    plt.show()
+from utils import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--epoch", type=int, default=0, help="epoch to start training from")
@@ -110,23 +78,10 @@ print("Configuring dataloaders")
 print('Loading datasets...')
 root_path = "dataset/"
 train_set = RGBTileDataset(dataset=opt.dataset_name, image_set="train")
-test_set = RGBTileDataset(dataset=opt.dataset_name, image_set="test")
 train_dl = DataLoader(dataset=train_set, num_workers=opt.threads, batch_size=opt.batch_size, shuffle=True)
-test_dl = DataLoader(dataset=test_set, num_workers=opt.threads, batch_size=opt.batch_size, shuffle=False)
 
 # Tensor type
 Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
-
-
-def sample_images(batches_done):
-    """Saves a generated sample from the validation set"""
-    imgs = next(iter(test_dl))
-    real_A = Variable(imgs["B"].type(Tensor))
-    real_B = Variable(imgs["A"].type(Tensor))
-    fake_B = generator(real_A)
-    img_sample = torch.cat((real_A.data, fake_B.data, real_B.data), -2)
-    save_image(img_sample, "images/%s/%s.png" % (opt.dataset_name, batches_done), nrow=5, normalize=True)
-
 
 # ----------
 #  Training
