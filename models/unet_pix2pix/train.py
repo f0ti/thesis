@@ -15,7 +15,7 @@ from utils import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--epoch", type=int, default=0, help="epoch to start training from")
-parser.add_argument("--n_epochs", type=int, default=6, help="number of epochs of training")
+parser.add_argument("--n_epochs", type=int, default=11, help="number of epochs of training")
 parser.add_argument("--dataset_name", type=str, default="melbourne", help="name of the dataset")
 parser.add_argument("--batch_size", type=int, default=4, help="size of the batches")
 parser.add_argument("--lr", type=float, default=0.0002, help="adam: learning rate")
@@ -25,7 +25,7 @@ parser.add_argument("--threads", type=int, default=8, help="number of cpu thread
 parser.add_argument("--img_height", type=int, default=256, help="size of image height")
 parser.add_argument("--img_width", type=int, default=256, help="size of image width")
 parser.add_argument("--channels", type=int, default=3, help="number of image channels")
-parser.add_argument("--sample_interval", type=int, default=500, help="interval between sampling of images from generators")
+parser.add_argument("--sample_interval", type=int, default=0, help="interval between sampling of images from generators")
 parser.add_argument("--checkpoint_interval", type=int, default=5, help="interval between model checkpoints")
 parser.add_argument("--wb", type=int, default=1, help="weights and biases")
 
@@ -34,9 +34,9 @@ opt = parser.parse_args()
 if opt.wb:
     wandb.init(project="pix2pix-pytorch-implementation", config=vars(opt))
 
-os.makedirs("dataset/%s" % opt.dataset_name, exist_ok=True)
-os.makedirs("images/%s" % opt.dataset_name, exist_ok=True)
 os.makedirs("saved_models/%s" % opt.dataset_name, exist_ok=True)
+if opt.sample_interval:
+    os.makedirs("images/%s" % opt.dataset_name, exist_ok=True)
 
 cuda = True if torch.cuda.is_available() else False
 
@@ -73,10 +73,7 @@ else:
 optimizer_G = torch.optim.Adam(generator.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2))
 optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2))
 
-print("Configuring dataloaders")
-
 print('Loading datasets...')
-root_path = "dataset/"
 train_set = RGBTileDataset(dataset=opt.dataset_name, image_set="train")
 test_set = RGBTileDataset(dataset=opt.dataset_name, image_set="test")
 train_dl = DataLoader(dataset=train_set, num_workers=opt.threads, batch_size=opt.batch_size, shuffle=True)

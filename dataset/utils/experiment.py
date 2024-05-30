@@ -21,5 +21,5 @@ label_path = "/home/foti/aerial/thesis/dataset/melbourne/rgb_data/test/Tile_+003
 input = np.load(input_path)
 label = np.load(label_path)
 
-print(input)
-show_xyz(input)
+print(label)
+show_rgb(label)
