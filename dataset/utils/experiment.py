@@ -21,13 +21,5 @@ label_path = "/home/foti/aerial/thesis/dataset/melbourne/rgb_data/test/Tile_+003
 input = np.load(input_path)
 label = np.load(label_path)
 
-# do some statistical analysis on the input
-print("Input statistics")
-print("Mean: ", np.mean(input))
-print("Std: ", np.std(input))
-print("Max: ", np.max(input))
-print("Min: ", np.min(input))
-print("Shape: ", input.shape)
-print("Type: ", input.dtype)
-print("Unique: ", np.unique(input))
-print("Unique count: ", np.unique(input, return_counts=True))
+print(input)
+show_xyz(input)

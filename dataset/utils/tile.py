@@ -1,4 +1,5 @@
 import os
+import stat
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -78,8 +79,23 @@ class Tile:
         plt.imshow(img)
         plt.show()
 
+    @staticmethod
+    def _scale_xyz(xyz: np.ndarray) -> np.ndarray:
+        # theoretically, we expect X and Y data values to be between 0-500 and Z between 0-50
+        xyz[:,:,0] = xyz[:,:,0] / 500
+        xyz[:,:,1] = xyz[:,:,1] / 500
+        xyz[:,:,2] = xyz[:,:,2] / 50
+
+        return xyz
+
+    @staticmethod
+    def _scale_rgb(img: np.ndarray) -> np.ndarray:
+        img /= 255
+        return img
+
     def save_rgb(self, root) -> None:
-        img = np.asarray(self.colors, dtype=np.uint8).reshape(self.width, self.height, 3)
+        img = np.asarray(self.colors, dtype=np.float32).reshape(self.width, self.height, 3)
+        img = self._scale_rgb(img)
         img_name = self.filename.split('/')[-1]
         np.save(f"{root}/{img_name}.npy", img)
 
@@ -91,5 +107,6 @@ class Tile:
 
     def save_xyz(self, root) -> None:
         xyz = np.asarray(self.xyz, dtype=np.float32).reshape(self.width, self.height, 3)
+        xyz = self._scale_xyz(xyz)
         xyz_name = self.filename.split('/')[-1]
         np.save(f"{root}/{xyz_name}.npy", xyz)
