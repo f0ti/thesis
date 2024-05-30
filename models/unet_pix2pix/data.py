@@ -40,6 +40,8 @@ class RGBTileDataset(Dataset):
         self.input_transforms = v2.Compose(
             [
                 v2.ToTensor(),
+                # normalize between 0 and 1
+                v2.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
                 v2.ToDtype(torch.float32),
             ]
         )

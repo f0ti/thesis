@@ -6,6 +6,7 @@ import datetime
 import sys
 import wandb
 import torch
+from torchvision.utils import save_image
 from torch.utils.data import DataLoader
 from torch.autograd import Variable
 from model import *
@@ -14,13 +15,12 @@ from utils import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--epoch", type=int, default=0, help="epoch to start training from")
-parser.add_argument("--n_epochs", type=int, default=10, help="number of epochs of training")
+parser.add_argument("--n_epochs", type=int, default=6, help="number of epochs of training")
 parser.add_argument("--dataset_name", type=str, default="melbourne", help="name of the dataset")
-parser.add_argument("--batch_size", type=int, default=16, help="size of the batches")
+parser.add_argument("--batch_size", type=int, default=4, help="size of the batches")
 parser.add_argument("--lr", type=float, default=0.0002, help="adam: learning rate")
-parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")
+parser.add_argument("--b1", type=float, default=0.9, help="adam: decay of first order momentum of gradient")
 parser.add_argument("--b2", type=float, default=0.999, help="adam: decay of first order momentum of gradient")
-parser.add_argument("--decay_epoch", type=int, default=100, help="epoch from which to start lr decay")
 parser.add_argument("--threads", type=int, default=8, help="number of cpu threads to use during batch generation")
 parser.add_argument("--img_height", type=int, default=256, help="size of image height")
 parser.add_argument("--img_width", type=int, default=256, help="size of image width")
@@ -45,7 +45,7 @@ criterion_GAN = torch.nn.MSELoss()
 criterion_pixelwise = torch.nn.L1Loss()
 
 # Loss weight of L1 pixel-wise loss between translated image and real image
-lambda_pixel = 10
+lambda_pixel = 100
 
 # Calculate output of image discriminator (PatchGAN)
 patch = (1, opt.img_height // 2 ** 4, opt.img_width // 2 ** 4)
@@ -78,10 +78,21 @@ print("Configuring dataloaders")
 print('Loading datasets...')
 root_path = "dataset/"
 train_set = RGBTileDataset(dataset=opt.dataset_name, image_set="train")
+test_set = RGBTileDataset(dataset=opt.dataset_name, image_set="test")
 train_dl = DataLoader(dataset=train_set, num_workers=opt.threads, batch_size=opt.batch_size, shuffle=True)
+test_dl = DataLoader(dataset=test_set, num_workers=opt.threads, batch_size=opt.batch_size, shuffle=False)
 
 # Tensor type
 Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
+
+def sample_images(batches_done):
+    """Saves a generated sample from the validation set"""
+    imgs = next(iter(test_dl))
+    real_A = Variable(imgs["B"].type(Tensor))
+    real_B = Variable(imgs["A"].type(Tensor))
+    fake_B = generator(real_A)
+    img_sample = torch.cat((real_A.data, fake_B.data, real_B.data), -2)
+    save_image(img_sample, "images/%s/%s.png" % (opt.dataset_name, batches_done), nrow=5, normalize=True)
 
 # ----------
 #  Training
@@ -96,8 +107,8 @@ for epoch in range(opt.epoch, opt.n_epochs):
         # show_rgb(batch["B"].numpy(), cols=4)
         
         # Model inputs
-        real_A = Variable(batch["B"].type(Tensor))
-        real_B = Variable(batch["A"].type(Tensor))
+        real_A = Variable(batch["A"].type(Tensor))
+        real_B = Variable(batch["B"].type(Tensor))
 
         # Adversarial ground truths
         valid = Variable(Tensor(np.ones((real_A.size(0), *patch))), requires_grad=False)
