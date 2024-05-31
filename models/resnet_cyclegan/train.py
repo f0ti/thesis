@@ -1,42 +1,36 @@
 import argparse
 import os
 import numpy as np
-import math
 import itertools
 import datetime
 import time
 import wandb
 
-import torchvision.transforms as transforms
 from torchvision.utils import save_image, make_grid
-
 from torch.utils.data import DataLoader
-from torchvision import datasets
 from torch.autograd import Variable
 
 from model import *
-from data import *
+from data import RGBTileDataset
 from utils import *
 
-import torch.nn as nn
-import torch.nn.functional as F
 import torch
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--epoch", type=int, default=0, help="epoch to start training from")
-parser.add_argument("--n_epochs", type=int, default=200, help="number of epochs of training")
-parser.add_argument("--dataset_name", type=str, default="monet2photo", help="name of the dataset")
-parser.add_argument("--batch_size", type=int, default=1, help="size of the batches")
+parser.add_argument("--n_epochs", type=int, default=11, help="number of epochs of training")
+parser.add_argument("--dataset_name", type=str, default="melbourne", help="name of the dataset")
+parser.add_argument("--batch_size", type=int, default=4, help="size of the batches")
 parser.add_argument("--lr", type=float, default=0.0002, help="adam: learning rate")
 parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")
 parser.add_argument("--b2", type=float, default=0.999, help="adam: decay of first order momentum of gradient")
-parser.add_argument("--decay_epoch", type=int, default=100, help="epoch from which to start lr decay")
-parser.add_argument("--n_cpu", type=int, default=8, help="number of cpu threads to use during batch generation")
+parser.add_argument("--decay_epoch", type=int, default=5, help="epoch from which to start lr decay")
+parser.add_argument("--threads", type=int, default=8, help="number of cpu threads to use during batch generation")
 parser.add_argument("--img_height", type=int, default=256, help="size of image height")
 parser.add_argument("--img_width", type=int, default=256, help="size of image width")
 parser.add_argument("--channels", type=int, default=3, help="number of image channels")
-parser.add_argument("--sample_interval", type=int, default=100, help="interval between saving generator outputs")
-parser.add_argument("--checkpoint_interval", type=int, default=-1, help="interval between saving model checkpoints")
+parser.add_argument("--sample_interval", type=int, default=0, help="interval between saving generator outputs")
+parser.add_argument("--checkpoint_interval", type=int, default=5, help="interval between saving model checkpoints")
 parser.add_argument("--n_residual_blocks", type=int, default=9, help="number of residual blocks in generator")
 parser.add_argument("--lambda_cyc", type=float, default=10.0, help="cycle loss weight")
 parser.add_argument("--lambda_id", type=float, default=5.0, help="identity loss weight")
@@ -46,10 +40,11 @@ opt = parser.parse_args()
 print(opt)
 
 if opt.wb:
-    wandb.init(project="pix2pix-pytorch-implementation", config=vars(opt))
+    wandb.init(project="thesis", config=vars(opt))
 
 # Create sample and checkpoint directories
-os.makedirs("images/%s" % opt.dataset_name, exist_ok=True)
+if opt.sample_interval:
+    os.makedirs("images/%s" % opt.dataset_name, exist_ok=True)
 os.makedirs("saved_models/%s" % opt.dataset_name, exist_ok=True)
 
 # Losses
@@ -113,34 +108,15 @@ Tensor = torch.cuda.FloatTensor if cuda else torch.Tensor
 fake_A_buffer = ReplayBuffer()
 fake_B_buffer = ReplayBuffer()
 
-# Image transformations
-transforms_ = [
-    transforms.Resize(int(opt.img_height * 1.12), Image.BICUBIC),
-    transforms.RandomCrop((opt.img_height, opt.img_width)),
-    transforms.RandomHorizontalFlip(),
-    transforms.ToTensor(),
-    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-]
-
-# Training data loader
-dataloader = DataLoader(
-    ImageDataset("../../data/%s" % opt.dataset_name, transforms_=transforms_, unaligned=True),
-    batch_size=opt.batch_size,
-    shuffle=True,
-    num_workers=opt.n_cpu,
-)
-# Test data loader
-val_dataloader = DataLoader(
-    ImageDataset("../../data/%s" % opt.dataset_name, transforms_=transforms_, unaligned=True, mode="test"),
-    batch_size=5,
-    shuffle=True,
-    num_workers=1,
-)
-
+print('Loading datasets...')
+train_set = RGBTileDataset(dataset=opt.dataset_name, image_set="train")
+test_set = RGBTileDataset(dataset=opt.dataset_name, image_set="test")
+train_dl = DataLoader(dataset=train_set, num_workers=opt.threads, batch_size=opt.batch_size, shuffle=True)
+test_dl = DataLoader(dataset=test_set, num_workers=opt.threads, batch_size=opt.batch_size, shuffle=False)
 
 def sample_images(batches_done):
     """Saves a generated sample from the test set"""
-    imgs = next(iter(val_dataloader))
+    imgs = next(iter(test_dl))
     G_AB.eval()
     G_BA.eval()
     real_A = Variable(imgs["A"].type(Tensor))
@@ -163,7 +139,11 @@ def sample_images(batches_done):
 
 prev_time = time.time()
 for epoch in range(opt.epoch, opt.n_epochs):
-    for i, batch in enumerate(dataloader):
+    for i, batch in enumerate(train_dl):
+
+        # show_xyz(batch["A"].numpy(), cols=4)
+        print(batch["B"])
+        # show_rgb(batch["B"].numpy(), cols=4)
 
         # Set model input
         real_A = Variable(batch["A"].type(Tensor))
@@ -251,10 +231,13 @@ for epoch in range(opt.epoch, opt.n_epochs):
         # --------------
 
         # Determine approximate time left
-        batches_done = epoch * len(dataloader) + i
-        batches_left = opt.n_epochs * len(dataloader) - batches_done
+        batches_done = epoch * len(train_dl) + i
+        batches_left = opt.n_epochs * len(train_dl) - batches_done
         time_left = datetime.timedelta(seconds=batches_left * (time.time() - prev_time))
         prev_time = time.time()
+
+        if opt.wb:
+            wandb.log({"Loss_D": loss_D.item(), "Loss_G": loss_G.item(), "adv": loss_GAN.item(), "cycle": loss_cycle.item(), "identity": loss_identity.item()})
 
         # Print log
         sys.stdout.write(
@@ -263,7 +246,7 @@ for epoch in range(opt.epoch, opt.n_epochs):
                 epoch,
                 opt.n_epochs,
                 i,
-                len(dataloader),
+                len(train_dl),
                 loss_D.item(),
                 loss_G.item(),
                 loss_GAN.item(),

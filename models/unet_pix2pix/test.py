@@ -12,13 +12,13 @@ parser = argparse.ArgumentParser(description="pix2pix-pytorch-implementation")
 parser.add_argument("--dataset", default="melbourne")
 parser.add_argument("--threads", type=int, default=8, help="number of cpu threads to use during batch generation")
 parser.add_argument("--batch_size", type=int, default=2, help="size of the batches")
-parser.add_argument("--nepochs", type=int, default=5, help="saved model epochs")
+parser.add_argument("--nepochs", type=int, default=10, help="saved model epochs")
 opt = parser.parse_args()
 
 cuda = True if torch.cuda.is_available() else False
 
 # load model
-model_path = "saved_models/{}/generator_{}.pth".format(opt.dataset, opt.nepochs)
+model_path = "models_vault/{}/generator_{}.pth".format(opt.dataset, opt.nepochs)
 model_g = GeneratorUNet()
 if cuda:
     model_g.cuda()

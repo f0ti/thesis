@@ -32,7 +32,7 @@ parser.add_argument("--wb", type=int, default=1, help="weights and biases")
 opt = parser.parse_args()
 
 if opt.wb:
-    wandb.init(project="pix2pix-pytorch-implementation", config=vars(opt))
+    wandb.init(project="thesis", config=vars(opt))
 
 os.makedirs("saved_models/%s" % opt.dataset_name, exist_ok=True)
 if opt.sample_interval:
@@ -62,8 +62,8 @@ if cuda:
 
 if opt.epoch != 0:
     # Load pretrained models
-    generator.load_state_dict(torch.load("saved_models/%s/generator_%d.pth" % (opt.dataset_name, opt.epoch)))
-    discriminator.load_state_dict(torch.load("saved_models/%s/discriminator_%d.pth" % (opt.dataset_name, opt.epoch)))
+    generator.load_state_dict(torch.load("models_vault/%s/generator_%d.pth" % (opt.dataset_name, opt.epoch)))
+    discriminator.load_state_dict(torch.load("models_vault/%s/discriminator_%d.pth" % (opt.dataset_name, opt.epoch)))
 else:
     # Initialize weights
     generator.apply(weights_init_normal)
@@ -181,10 +181,11 @@ for epoch in range(opt.epoch, opt.n_epochs):
         )
 
         # If at sample interval save image
-        if batches_done % opt.sample_interval == 0:
-            sample_images(batches_done)
+        if opt.sample_interval:
+            if batches_done % opt.sample_interval == 0:
+                sample_images(batches_done)
 
     if opt.checkpoint_interval != -1 and epoch % opt.checkpoint_interval == 0:
         # Save model checkpoints
-        torch.save(generator.state_dict(), "saved_models/%s/generator_%d.pth" % (opt.dataset_name, epoch))
-        torch.save(discriminator.state_dict(), "saved_models/%s/discriminator_%d.pth" % (opt.dataset_name, epoch))
+        torch.save(generator.state_dict(), "dev_models/%s/generator_%d.pth" % (opt.dataset_name, epoch))
+        torch.save(discriminator.state_dict(), "dev_models/%s/discriminator_%d.pth" % (opt.dataset_name, epoch))

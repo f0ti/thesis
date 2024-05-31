@@ -29,11 +29,11 @@ class RGBTileDataset(Dataset):
 
         dataset_path = os.path.join(self.base_dir, self.dataset)
 
-        self.rgb_path = os.path.join(dataset_path, "A", image_set)
-        self.xyz_path = os.path.join(dataset_path, "B", image_set)
+        self.xyz_path = os.path.join(dataset_path, "A", image_set)
+        self.rgb_path = os.path.join(dataset_path, "B", image_set)
 
-        self.rgb_samples = sorted(os.listdir(self.rgb_path))[:max_samples]
         self.xyz_samples = sorted(os.listdir(self.xyz_path))[:max_samples]
+        self.rgb_samples = sorted(os.listdir(self.rgb_path))[:max_samples]
 
         assert len(self.rgb_samples) == len(self.xyz_samples), "Number of samples in RGB and XYZ folders do not match"
 

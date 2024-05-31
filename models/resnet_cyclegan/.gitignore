@@ -90,6 +90,3 @@ ENV/
 
 dataset/
 wandb/
-dev_models/
-images/
-models_vault/

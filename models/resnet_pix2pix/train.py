@@ -49,7 +49,7 @@ parser.add_argument('--wandb', type=int, default=1, help='weights and biases')
 opt = parser.parse_args()
 
 if opt.wandb:
-    wandb.init(project="pix2pix-pytorch-implementation", config=vars(opt))
+    wandb.init(project="thesis", config=vars(opt))
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 cudnn.benchmark = True
