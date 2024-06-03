@@ -18,14 +18,14 @@ import torch
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--epoch", type=int, default=0, help="epoch to start training from")
-parser.add_argument("--n_epochs", type=int, default=11, help="number of epochs of training")
+parser.add_argument("--n_epochs", type=int, default=6, help="number of epochs of training")
 parser.add_argument("--dataset_name", type=str, default="melbourne", help="name of the dataset")
-parser.add_argument("--batch_size", type=int, default=4, help="size of the batches")
+parser.add_argument("--batch_size", type=int, default=1, help="size of the batches")
 parser.add_argument("--lr", type=float, default=0.0002, help="adam: learning rate")
 parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")
 parser.add_argument("--b2", type=float, default=0.999, help="adam: decay of first order momentum of gradient")
 parser.add_argument("--decay_epoch", type=int, default=5, help="epoch from which to start lr decay")
-parser.add_argument("--threads", type=int, default=8, help="number of cpu threads to use during batch generation")
+parser.add_argument("--threads", type=int, default=16, help="number of cpu threads to use during batch generation")
 parser.add_argument("--img_height", type=int, default=256, help="size of image height")
 parser.add_argument("--img_width", type=int, default=256, help="size of image width")
 parser.add_argument("--channels", type=int, default=3, help="number of image channels")
@@ -142,7 +142,6 @@ for epoch in range(opt.epoch, opt.n_epochs):
     for i, batch in enumerate(train_dl):
 
         # show_xyz(batch["A"].numpy(), cols=4)
-        print(batch["B"])
         # show_rgb(batch["B"].numpy(), cols=4)
 
         # Set model input
@@ -257,8 +256,9 @@ for epoch in range(opt.epoch, opt.n_epochs):
         )
 
         # If at sample interval save image
-        if batches_done % opt.sample_interval == 0:
-            sample_images(batches_done)
+        if opt.sample_interval:
+            if batches_done % opt.sample_interval == 0:
+                sample_images(batches_done)
 
     # Update learning rates
     lr_scheduler_G.step()

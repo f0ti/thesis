@@ -6,6 +6,9 @@ import datetime
 import sys
 import wandb
 import torch
+import shortuuid
+
+from torchmetrics.image import VisualInformationFidelity
 from torchvision.utils import save_image
 from torch.utils.data import DataLoader
 from torch.autograd import Variable
@@ -43,6 +46,7 @@ cuda = True if torch.cuda.is_available() else False
 # Loss functions
 criterion_GAN = torch.nn.MSELoss()
 criterion_pixelwise = torch.nn.L1Loss()
+criterion_vifp = VisualInformationFidelity()
 
 # Loss weight of L1 pixel-wise loss between translated image and real image
 lambda_pixel = 100
@@ -59,6 +63,7 @@ if cuda:
     discriminator = discriminator.cuda()
     criterion_GAN.cuda()
     criterion_pixelwise.cuda()
+    criterion_vifp.cuda()
 
 if opt.epoch != 0:
     # Load pretrained models
@@ -122,10 +127,11 @@ for epoch in range(opt.epoch, opt.n_epochs):
         pred_fake = discriminator(fake_B, real_A)
         loss_GAN = criterion_GAN(pred_fake, valid)
         # Pixel-wise loss
-        loss_pixel = criterion_pixelwise(fake_B, real_B)
+        loss_pixel = criterion_pixelwise(fake_B, real_B) * lambda_pixel
+        # Visual Information Fidelity loss
+        loss_vifp = criterion_vifp(fake_B, real_B)
 
-        # Total loss
-        loss_G = loss_GAN + lambda_pixel * loss_pixel
+        loss_G = loss_GAN + loss_pixel + loss_vifp
 
         loss_G.backward()
 
@@ -187,5 +193,6 @@ for epoch in range(opt.epoch, opt.n_epochs):
 
     if opt.checkpoint_interval != -1 and epoch % opt.checkpoint_interval == 0:
         # Save model checkpoints
-        torch.save(generator.state_dict(), "dev_models/%s/generator_%d.pth" % (opt.dataset_name, epoch))
-        torch.save(discriminator.state_dict(), "dev_models/%s/discriminator_%d.pth" % (opt.dataset_name, epoch))
+        id = shortuuid.uuid()
+        torch.save(generator.state_dict(), "dev_models/%s/%s_generator_%d.pth" % (opt.dataset_name, id, epoch))
+        torch.save(discriminator.state_dict(), "dev_models/%s/%s_discriminator_%d.pth" % (opt.dataset_name, id, epoch))
