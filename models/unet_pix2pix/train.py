@@ -8,13 +8,13 @@ import wandb
 import torch
 import shortuuid
 
-from torchmetrics.image import VisualInformationFidelity
 from torchvision.utils import save_image
 from torch.utils.data import DataLoader
 from torch.autograd import Variable
-from model import *
 from data import *
+from loss import *
 from utils import *
+from model import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--epoch", type=int, default=0, help="epoch to start training from")
@@ -46,7 +46,8 @@ cuda = True if torch.cuda.is_available() else False
 # Loss functions
 criterion_GAN = torch.nn.MSELoss()
 criterion_pixelwise = torch.nn.L1Loss()
-criterion_vifp = VisualInformationFidelity()
+# criterion_vifp = VIFLoss()
+criterion_fid = FrechetID()
 
 # Loss weight of L1 pixel-wise loss between translated image and real image
 lambda_pixel = 100
@@ -63,7 +64,8 @@ if cuda:
     discriminator = discriminator.cuda()
     criterion_GAN.cuda()
     criterion_pixelwise.cuda()
-    criterion_vifp.cuda()
+    # criterion_vifp.cuda()
+    criterion_fid.cuda()
 
 if opt.epoch != 0:
     # Load pretrained models
@@ -127,11 +129,13 @@ for epoch in range(opt.epoch, opt.n_epochs):
         pred_fake = discriminator(fake_B, real_A)
         loss_GAN = criterion_GAN(pred_fake, valid)
         # Pixel-wise loss
-        loss_pixel = criterion_pixelwise(fake_B, real_B) * lambda_pixel
+        loss_pixel = criterion_pixelwise(fake_B, real_B)
         # Visual Information Fidelity loss
-        loss_vifp = criterion_vifp(fake_B, real_B)
+        # loss_vifp = criterion_vifp(fake_B, real_B)
+        # Frechet Inception Distance loss
+        loss_fid = criterion_fid(fake_B, real_B)
 
-        loss_G = loss_GAN + loss_pixel + loss_vifp
+        loss_G = loss_GAN + loss_pixel * lambda_pixel + loss_fid
 
         loss_G.backward()
 
