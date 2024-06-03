@@ -6,7 +6,7 @@ from data import RGBTileDataset
 from model import GeneratorUNet
 from torch.utils.data import DataLoader
 from torch.autograd import Variable
-from utils import show_xyz, show_rgb
+from utils import show_xyz, show_rgb, show_diff
 
 parser = argparse.ArgumentParser(description="pix2pix-pytorch-implementation")
 parser.add_argument("--dataset", default="melbourne")
@@ -25,8 +25,8 @@ if cuda:
 model_g.load_state_dict(torch.load(model_path))
 
 # print all weights
-for name, param in model_g.named_parameters():
-    print(name, param)
+# for name, param in model_g.named_parameters():
+#     print(name, param)
 
 Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
 
@@ -37,9 +37,20 @@ for i, batch in enumerate(test_dl):
     
     # Model inputs
     xyz_input = Variable(batch["A"].type(Tensor))
-    # rgb_label = Variable(batch["B"].type(Tensor))
     out_imgs = model_g(xyz_input)
     label = out_imgs.cpu().data.numpy()
+    
+    # XYZ (only Z)
     show_xyz(batch["A"].numpy(), cols=2)
-    # show_rgb(batch["B"].numpy(), cols=2)
+    
+    # ground truth RGB
+    show_rgb(batch["B"].numpy(), cols=2)
+
+    # predicted RGB
     show_rgb(label, cols=2)
+
+    print(batch["B"].numpy().dtype, label.dtype)
+    print(batch["B"].numpy().shape, label.shape)
+
+    # difference
+    show_diff(batch["B"].numpy(), label, cols=2)
