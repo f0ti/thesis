@@ -5,6 +5,8 @@ import numpy as np
 import torch
 from typing import Optional, Callable
 from torch.utils.data import Dataset
+from torch.utils.data import DataLoader
+
 from torchvision.transforms import v2
 from PIL import Image
 
@@ -65,3 +67,52 @@ class RGBTileDataset(Dataset):
         label = self.label_transforms(label)
 
         return {"A": input, "B": label}
+
+
+# Needed for the evaluation script, returns chosen dataloaders for the FID calculation
+class RGBDomainIndependentDataset(Dataset):
+    def __init__(
+        self,
+        dataset: str = "melbourne",
+        image_set: str = "test",
+        domain: str = "xyz",
+        transform: Optional[Callable] = None,
+        max_samples: Optional[int] = None,
+    ):
+        super().__init__()
+
+        assert dataset in ["melbourne"], "Dataset not supported"
+        assert image_set in ["train", "test", "val"]
+        assert domain in ["xyz", "rgb"]
+
+        self.dataset = dataset
+        self.base_dir = "dataset"
+        self.image_set = image_set
+        self.max_samples = max_samples
+        self.transform = transform
+
+        dataset_path = os.path.join(self.base_dir, self.dataset)
+
+        if domain == "xyz":
+            self.path = os.path.join(dataset_path, "A", image_set)
+            self.samples = sorted(os.listdir(self.path))[:max_samples]
+        else:
+            self.path = os.path.join(dataset_path, "B", image_set)
+            self.samples = sorted(os.listdir(self.path))[:max_samples]
+
+        self.transforms = v2.Compose(
+            [
+                v2.ToTensor(),
+                v2.ToDtype(torch.float32),
+            ]
+        )
+
+    def __len__(self) -> int:
+        return len(self.samples)
+
+    def __getitem__(self, index):
+        data_path = os.path.join(self.path, self.samples[index])
+        data = np.load(data_path)
+        data = self.transforms(data)
+    
+        return {"images": data}

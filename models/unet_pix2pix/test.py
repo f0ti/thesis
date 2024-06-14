@@ -1,7 +1,5 @@
 import torch
 import argparse
-import numpy as np
-from torch import Tensor
 from data import RGBTileDataset
 from model import GeneratorUNet
 from torch.utils.data import DataLoader
@@ -54,3 +52,4 @@ for i, batch in enumerate(test_dl):
 
     # difference
     show_diff(batch["B"].numpy(), label, cols=2)
+
