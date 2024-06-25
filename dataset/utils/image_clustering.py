@@ -8,7 +8,7 @@ class ImageHistogramClustering:
     def __init__(self, root, max_samples, channels=[0, 1, 2], hist_bins=32, n_clusters=2):
         self.root = root
         self.max_samples = max_samples
-        self.paths = os.listdir(root)[:max_samples]
+        self.paths = os.listdir(root)[500:max_samples]
         self.n_clusters = n_clusters
         self.channels = channels
         self.hist_bins = hist_bins
@@ -53,9 +53,18 @@ class ImageHistogramClustering:
             axs[i].axis('off')
         plt.show()
 
+    # this method takes the clustered images and saves them to a new directory
+    # by splitting the images into two folders
+    def save_clustered_images(self):
+        for i in range(2):
+            os.makedirs(f"cluster_{i}", exist_ok=True)
+        for path, label in zip(self.paths, self.model.labels_):
+            img = np.load(os.path.join(self.root, path))
+            cv2.imwrite(f"cluster_{label}/{path}", img)
+
 if __name__ == "__main__":
-    root = "../melbourne/rgb_data/test"
-    ic = ImageHistogramClustering(root, max_samples=1000, n_clusters=2)
+    root = "../melbourne/rgb_data"
+    ic = ImageHistogramClustering(root, channels=[1], max_samples=1000, n_clusters=2)
 
     ic.cluster()
     ic.show_cluster_images(0)

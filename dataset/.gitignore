@@ -1,8 +1,4 @@
-melbourne/raw_data
-melbourne/tiles_data
-melbourne/las_data
-melbourne/rgb_data
-melbourne/xyz_data
+melbourne-top/
 imgs/
 PointCloud2Image
 pc2img/tiles/
