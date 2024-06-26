@@ -197,6 +197,11 @@ for epoch in range(opt.epoch, opt.n_epochs):
 
     if opt.checkpoint_interval != -1 and epoch % opt.checkpoint_interval == 0:
         # Save model checkpoints
-        id = shortuuid.uuid()
-        torch.save(generator.state_dict(), "dev_models/%s/%s_generator_%d.pth" % (opt.dataset_name, id, epoch))
-        torch.save(discriminator.state_dict(), "dev_models/%s/%s_discriminator_%d.pth" % (opt.dataset_name, id, epoch))
+        if opt.wb:
+            saving_dir = os.path.join("saved_models", wandb.run.name)
+            os.makedirs(saving_dir, exist_ok=True)
+            torch.save(generator.state_dict(), os.path.join(saving_dir, f"generator_{epoch}.pth"))
+        else:
+            from random import randint
+            saving_dir = os.path.join("saved_models", str(randint(1, 1000)))
+            torch.save(generator.state_dict(), os.path.join(saving_dir, f"generator_{epoch}.pth"))

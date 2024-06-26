@@ -5,35 +5,34 @@ import numpy as np
 import torch
 from typing import Optional, Callable
 from torch.utils.data import Dataset
-from torch.utils.data import DataLoader
-
 from torchvision.transforms import v2
-from PIL import Image
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class RGBTileDataset(Dataset):
     def __init__(
         self,
-        dataset: str = "melbourne",
+        dataset: str = "melbourne-top",
         image_set: str = "train",
         transform: Optional[Callable] = None,
         max_samples: Optional[int] = None,
     ):
         super().__init__()
 
-        assert dataset in ["melbourne"], "Dataset not supported"
+        assert dataset in ["melbourne-top"], "Dataset not supported"
         assert image_set in ["train", "test", "val"]
 
         self.dataset = dataset
-        self.base_dir = "dataset"
+        self.base_dir = os.environ.get("DATASET_ROOT") or "."
         self.image_set = image_set
         self.max_samples = max_samples
         self.transform = transform
 
         dataset_path = os.path.join(self.base_dir, self.dataset)
 
-        self.xyz_path = os.path.join(dataset_path, "A", image_set)
-        self.rgb_path = os.path.join(dataset_path, "B", image_set)
-
+        self.xyz_path = os.path.join(dataset_path, image_set, "xyz_data")
+        self.rgb_path = os.path.join(dataset_path, image_set, "rgb_data")
         self.xyz_samples = sorted(os.listdir(self.xyz_path))[:max_samples]
         self.rgb_samples = sorted(os.listdir(self.rgb_path))[:max_samples]
 
