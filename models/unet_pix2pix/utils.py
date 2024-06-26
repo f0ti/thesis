@@ -46,3 +46,7 @@ def show_diff(ground_truth, predicted, cols=4, figsize=(20, 20)):
         ax.axis('off')
     plt.tight_layout()
     plt.show()
+
+def print_weights(model):
+    for name, param in model.named_parameters():
+        print(name, param)

@@ -1,10 +1,15 @@
 import torch
 import argparse
+import matplotlib.pyplot as plt
 from data import RGBTileDataset
 from model import GeneratorUNet
 from torch.utils.data import DataLoader
 from torch.autograd import Variable
 from utils import show_xyz, show_rgb, show_diff
+from evaluate import evaluate_fid
+from piq import vsi
+
+SAVE_PRED = True
 
 parser = argparse.ArgumentParser(description="pix2pix-pytorch-implementation")
 parser.add_argument("--dataset", default="melbourne")
@@ -22,10 +27,6 @@ if cuda:
     model_g.cuda()
 model_g.load_state_dict(torch.load(model_path))
 
-# print all weights
-# for name, param in model_g.named_parameters():
-#     print(name, param)
-
 Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
 
 test_set = RGBTileDataset(dataset=opt.dataset, image_set="test")
@@ -37,7 +38,12 @@ for i, batch in enumerate(test_dl):
     xyz_input = Variable(batch["A"].type(Tensor))
     out_imgs = model_g(xyz_input)
     label = out_imgs.cpu().data.numpy()
-    
+
+    print(show_rgb(batch["B"].numpy(), cols=2))
+
+    # get Visual Saliency-induced Index (VSI)
+    # vsi_score = vsi(out_imgs, batch["B"].type(Tensor))
+
     # XYZ (only Z)
     show_xyz(batch["A"].numpy(), cols=2)
     
@@ -47,9 +53,5 @@ for i, batch in enumerate(test_dl):
     # predicted RGB
     show_rgb(label, cols=2)
 
-    print(batch["B"].numpy().dtype, label.dtype)
-    print(batch["B"].numpy().shape, label.shape)
-
     # difference
     show_diff(batch["B"].numpy(), label, cols=2)
-

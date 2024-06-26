@@ -18,8 +18,8 @@ import torch
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--epoch", type=int, default=0, help="epoch to start training from")
-parser.add_argument("--n_epochs", type=int, default=6, help="number of epochs of training")
-parser.add_argument("--dataset_name", type=str, default="melbourne", help="name of the dataset")
+parser.add_argument("--n_epochs", type=int, default=11, help="number of epochs of training")
+parser.add_argument("--dataset_name", type=str, default="melbourne-top", help="name of the dataset")
 parser.add_argument("--batch_size", type=int, default=1, help="size of the batches")
 parser.add_argument("--lr", type=float, default=0.0002, help="adam: learning rate")
 parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")
@@ -164,7 +164,7 @@ for epoch in range(opt.epoch, opt.n_epochs):
         # Identity loss
         loss_id_A = criterion_identity(G_BA(real_A), real_A)
         loss_id_B = criterion_identity(G_AB(real_B), real_B)
-
+    
         loss_identity = (loss_id_A + loss_id_B) / 2
 
         # GAN loss
@@ -267,7 +267,13 @@ for epoch in range(opt.epoch, opt.n_epochs):
 
     if opt.checkpoint_interval != -1 and epoch % opt.checkpoint_interval == 0:
         # Save model checkpoints
-        torch.save(G_AB.state_dict(), "saved_models/%s/G_AB_%d.pth" % (opt.dataset_name, epoch))
-        torch.save(G_BA.state_dict(), "saved_models/%s/G_BA_%d.pth" % (opt.dataset_name, epoch))
-        torch.save(D_A.state_dict(), "saved_models/%s/D_A_%d.pth" % (opt.dataset_name, epoch))
-        torch.save(D_B.state_dict(), "saved_models/%s/D_B_%d.pth" % (opt.dataset_name, epoch))
+        if opt.wb:
+            saving_dir = os.path.join("saved_models", wandb.run.name)
+            os.makedirs(saving_dir, exist_ok=True)
+            torch.save(G_AB.state_dict(), os.path.join(saving_dir, f"G_AB_{epoch}.pth"))
+            torch.save(G_BA.state_dict(), os.path.join(saving_dir, f"G_BA_{epoch}.pth"))
+        else:
+            from random import randint
+            saving_dir = os.path.join("saved_models", str(randint(1, 1000)))
+            torch.save(G_AB.state_dict(), os.path.join(saving_dir, f"G_AB_{epoch}.pth"))
+            torch.save(G_BA.state_dict(), os.path.join(saving_dir, f"G_AB_{epoch}.pth"))
