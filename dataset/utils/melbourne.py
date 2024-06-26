@@ -6,6 +6,7 @@ from dataset.utils.point import Point
 
 DATA_DIR = "../data/CoM_Point_Cloud_2018_LAS"
 
+
 class PointCloudReader:
     def __init__(self, data_dir) -> None:
         self.data_dir = data_dir
@@ -25,10 +26,10 @@ class LasReader:
     def read_las(self, filename):
         file_dir = os.path.join(self.data_dir, filename)
 
-        with laspy.open(file_dir, mode='r') as fh:
-            print('Points from Header:', fh.header.point_count)
+        with laspy.open(file_dir, mode="r") as fh:
+            print("Points from Header:", fh.header.point_count)
             las = fh.read()
-            print('Points from data:', len(las.points))
+            print("Points from data:", len(las.points))
 
             return las
 

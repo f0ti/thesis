@@ -1,5 +1,6 @@
 import ctypes
 
+
 class Point:
     X: ctypes.c_double
     Y: ctypes.c_double

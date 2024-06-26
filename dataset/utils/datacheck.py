@@ -1,6 +1,8 @@
 import os
+import sys
 import numpy as np
 from PIL import Image
+
 
 class DataCheck:
     def __init__(self, dataset_path) -> None:
@@ -8,7 +10,7 @@ class DataCheck:
 
     def check_RGB(self, folder="test"):
 
-        folder_path = os.path.join(self.dataset_path, "rgb_data", folder)
+        folder_path = os.path.join(self.dataset_path, folder, "rgb_data")
         paths = sorted(os.listdir(folder_path))
 
         for path in paths:
@@ -29,9 +31,9 @@ class DataCheck:
 
     def check_XYZ(self, folder="test"):
 
-        folder_path = os.path.join(self.dataset_path, "xyz_data", folder)
+        folder_path = os.path.join(self.dataset_path, folder, "xyz_data")
         paths = sorted(os.listdir(folder_path))
-        
+
         for path in paths:
             file_dir = os.path.join(folder_path, path)
             xyz = np.load(file_dir)
@@ -47,6 +49,7 @@ class DataCheck:
 
 
 if __name__ == "__main__":
-    datacheck = DataCheck(dataset_path="../melbourne")
+    dataset_name = sys.argv[1]
+    datacheck = DataCheck(dataset_path=f"../{dataset_name}")
     datacheck.check_RGB()
     datacheck.check_XYZ()

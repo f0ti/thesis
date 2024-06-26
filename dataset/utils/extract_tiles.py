@@ -6,16 +6,17 @@ from tile import Tile
 # change for different dataset
 TILE_BYTESIZE = 2162700
 
+
 def generate_rgb_data(dataset_name):
 
-    assert dataset_name in ['melbourne-top']
+    assert dataset_name in ["melbourne-top"]
 
     base_dir = f"../{dataset_name}/tiles_data"
     save_dir = f"../{dataset_name}/rgb_data"
-    
+
     os.makedirs(base_dir, exist_ok=True)
     os.makedirs(save_dir, exist_ok=True)
-    
+
     paths = os.listdir(base_dir)
 
     print("Generating RGB data")
@@ -29,14 +30,14 @@ def generate_rgb_data(dataset_name):
 
 def generate_xyz_data(dataset_name):
 
-    assert dataset_name in ['melbourne-top']
+    assert dataset_name in ["melbourne-top"]
 
     base_dir = f"../{dataset_name}/tiles_data"
     save_dir = f"../{dataset_name}/xyz_data"
-    
+
     os.makedirs(base_dir, exist_ok=True)
     os.makedirs(save_dir, exist_ok=True)
-    
+
     paths = os.listdir(base_dir)
 
     print("Generating XYZ data")

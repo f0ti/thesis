@@ -2,41 +2,47 @@ import requests
 from bs4 import BeautifulSoup
 import re
 
+
 def parse_response(html_content):
-    soup = BeautifulSoup(html_content, 'html.parser')
+    soup = BeautifulSoup(html_content, "html.parser")
     options = {}
-    items = soup.find_all('li')
+    items = soup.find_all("li")
     for index, item in enumerate(items):
-        link = item.find('a')
+        link = item.find("a")
         if link:
             file_name = link.text.strip()
-            file_url = link['href']
-            if (file_size := re.search(r'\((.*?)\)', item.text)) is not None:
+            file_url = link["href"]
+            if (file_size := re.search(r"\((.*?)\)", item.text)) is not None:
                 file_size = file_size.group(1)
             else:
                 file_size = "unknown size"
             options[index] = {
-                'filename': f"{file_name}",
+                "filename": f"{file_name}",
                 "size": file_size,
-                'url': file_url
+                "url": file_url,
             }
     return options
+
 
 def print_options(options):
     for key, value in options.items():
         print(f"{key}. {value['filename']} ({value['size']})")
 
+
 def choose_option(options):
     while True:
         print_options(options)
-        choice = input("Enter the number of the file you want to download (or 'q' to quit): ")
+        choice = input(
+            "Enter the number of the file you want to download (or 'q' to quit): "
+        )
         if choice.isdigit():
             choice = int(choice)
             if choice in options:
                 return options[choice]
-        elif choice.lower() == 'q':
+        elif choice.lower() == "q":
             return None
         print("Invalid input. Please enter a valid number or 'q' to quit.")
+
 
 class ShowRequest:
     def __init__(self, x, y):
@@ -45,23 +51,26 @@ class ShowRequest:
         self.y = y
 
     def get(self):
-        response = requests.get(self.base_show_url, params={'kaardiruut': f"{self.x}{self.y}"})
+        response = requests.get(
+            self.base_show_url, params={"kaardiruut": f"{self.x}{self.y}"}
+        )
         # check if "File not found" is in the response
         if "File not found" in response.text:
             print("File not found:", self.x, self.y)
             return
-        
+
         if response.status_code != 200:
             print("Failed to get the page")
             return
         else:
             return response.text
 
+
 class DownloadRequest:
     def __init__(self, choice):
         self.base_download_url = "https://geoportaal.maaamet.ee/"
-        self.url = choice['url']
-        self.file_name = choice['filename']
+        self.url = choice["url"]
+        self.file_name = choice["filename"]
 
     def get(self):
         print("Requesting", self.file_name)
@@ -73,7 +82,7 @@ class DownloadRequest:
             print("Failed to download", self.file_name)
             return
         else:
-            with open(self.file_name, mode='wb') as localfile:
+            with open(self.file_name, mode="wb") as localfile:
                 localfile.write(response.content)
 
 
@@ -82,8 +91,9 @@ X_min = 470
 X_max = 584
 Y_min = 375
 Y_max = 619  # does not include an island in the north
-X = range(X_min, X_max+1)
-Y = range(Y_min, Y_max+1)
+X = range(X_min, X_max + 1)
+Y = range(Y_min, Y_max + 1)
+
 
 def do_one(x, y):
     sr = ShowRequest(x, y)
@@ -99,8 +109,10 @@ def do_one(x, y):
         dr = DownloadRequest(selected_option)
         dr.get()
 
+
 def do_all():
     for x, y in zip(X, Y):
         do_one(x, y)
+
 
 do_all()
