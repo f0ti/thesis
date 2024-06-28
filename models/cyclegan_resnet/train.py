@@ -5,16 +5,16 @@ import itertools
 import datetime
 import time
 import wandb
+import torch
 
 from torchvision.utils import save_image, make_grid
 from torch.utils.data import DataLoader
 from torch.autograd import Variable
 
-from model import *
-from data import RGBTileDataset
 from utils import *
-
-import torch
+from model import *
+from loss import *
+from data import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--epoch", type=int, default=0, help="epoch to start training from")
@@ -51,6 +51,7 @@ os.makedirs("saved_models/%s" % opt.dataset_name, exist_ok=True)
 criterion_GAN = torch.nn.MSELoss()
 criterion_cycle = torch.nn.L1Loss()
 criterion_identity = torch.nn.L1Loss()
+criterion_tv = TotalVariationLoss()
 
 cuda = torch.cuda.is_available()
 
@@ -183,8 +184,11 @@ for epoch in range(opt.epoch, opt.n_epochs):
 
         loss_cycle = (loss_cycle_A + loss_cycle_B) / 2
 
+        # Total Variation loss
+        loss_tv = criterion_tv(fake_A) + criterion_tv(fake_B)
+
         # Total loss
-        loss_G = loss_GAN + opt.lambda_cyc * loss_cycle + opt.lambda_id * loss_identity
+        loss_G = loss_GAN + opt.lambda_cyc * loss_cycle + opt.lambda_id * loss_identity + loss_tv
 
         loss_G.backward()
         optimizer_G.step()
