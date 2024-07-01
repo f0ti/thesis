@@ -18,19 +18,19 @@ from data import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--epoch", type=int, default=0, help="epoch to start training from")
-parser.add_argument("--n_epochs", type=int, default=11, help="number of epochs of training")
+parser.add_argument("--n_epochs", type=int, default=1, help="number of epochs of training")
 parser.add_argument("--dataset_name", type=str, default="melbourne-top", help="name of the dataset")
 parser.add_argument("--batch_size", type=int, default=1, help="size of the batches")
 parser.add_argument("--lr", type=float, default=0.0002, help="adam: learning rate")
 parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")
 parser.add_argument("--b2", type=float, default=0.999, help="adam: decay of first order momentum of gradient")
-parser.add_argument("--decay_epoch", type=int, default=5, help="epoch from which to start lr decay")
+parser.add_argument("--decay_epoch", type=int, default=0, help="epoch from which to start lr decay")
 parser.add_argument("--threads", type=int, default=16, help="number of cpu threads to use during batch generation")
 parser.add_argument("--img_height", type=int, default=256, help="size of image height")
 parser.add_argument("--img_width", type=int, default=256, help="size of image width")
 parser.add_argument("--channels", type=int, default=3, help="number of image channels")
 parser.add_argument("--sample_interval", type=int, default=0, help="interval between saving generator outputs")
-parser.add_argument("--checkpoint_interval", type=int, default=5, help="interval between saving model checkpoints")
+parser.add_argument("--ckpt", type=int, default=1, help="interval between saving model checkpoints")
 parser.add_argument("--n_residual_blocks", type=int, default=9, help="number of residual blocks in generator")
 parser.add_argument("--lambda_cyc", type=float, default=10.0, help="cycle loss weight")
 parser.add_argument("--lambda_id", type=float, default=5.0, help="identity loss weight")
@@ -186,10 +186,14 @@ for epoch in range(opt.epoch, opt.n_epochs):
         loss_cycle = (loss_cycle_A + loss_cycle_B) / 2
 
         # Total Variation loss
-        loss_tv = criterion_tv(fake_A) + criterion_tv(fake_B)
+        loss_tv_A = criterion_tv(fake_A)
+        loss_tv_B = criterion_tv(fake_B)
+
+        loss_tv = (loss_tv_A + loss_tv_B) / 2
+        lambda_tv = 0.1
 
         # Total loss
-        loss_G = loss_GAN + opt.lambda_cyc * loss_cycle + opt.lambda_id * loss_identity + loss_tv
+        loss_G = loss_GAN + opt.lambda_cyc * loss_cycle + opt.lambda_id * loss_identity + loss_tv * lambda_tv
 
         loss_G.backward()
         optimizer_G.step()
@@ -270,7 +274,7 @@ for epoch in range(opt.epoch, opt.n_epochs):
     lr_scheduler_D_A.step()
     lr_scheduler_D_B.step()
 
-    if opt.checkpoint_interval != -1 and epoch % opt.checkpoint_interval == 0:
+    if opt.ckpt != -1 and epoch+1 % opt.ckpt == 0:
         # Save model checkpoints
         if opt.wb:
             saving_dir = os.path.join("saved_models", wandb.run.name)
