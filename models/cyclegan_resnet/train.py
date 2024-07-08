@@ -15,10 +15,10 @@ from utils import *
 from model import *
 from loss import *
 from data import *
+from config import *
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--epoch", type=int, default=0, help="epoch to start training from")
-parser.add_argument("--n_epochs", type=int, default=1, help="number of epochs of training")
+parser.add_argument("--epochs", type=int, default=11, help="number of epochs of training")
 parser.add_argument("--dataset_name", type=str, default="melbourne-top", help="name of the dataset")
 parser.add_argument("--batch_size", type=int, default=1, help="size of the batches")
 parser.add_argument("--lr", type=float, default=0.0002, help="adam: learning rate")
@@ -26,18 +26,15 @@ parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first 
 parser.add_argument("--b2", type=float, default=0.999, help="adam: decay of first order momentum of gradient")
 parser.add_argument("--decay_epoch", type=int, default=0, help="epoch from which to start lr decay")
 parser.add_argument("--threads", type=int, default=16, help="number of cpu threads to use during batch generation")
-parser.add_argument("--img_height", type=int, default=256, help="size of image height")
-parser.add_argument("--img_width", type=int, default=256, help="size of image width")
-parser.add_argument("--channels", type=int, default=3, help="number of image channels")
 parser.add_argument("--sample_interval", type=int, default=0, help="interval between saving generator outputs")
-parser.add_argument("--ckpt", type=int, default=1, help="interval between saving model checkpoints")
+parser.add_argument("--ckpt", type=int, default=2, help="interval between saving model checkpoints")
 parser.add_argument("--n_residual_blocks", type=int, default=9, help="number of residual blocks in generator")
 parser.add_argument("--lambda_cyc", type=float, default=10.0, help="cycle loss weight")
 parser.add_argument("--lambda_id", type=float, default=5.0, help="identity loss weight")
+parser.add_argument("--lambda_tv", type=float, default=0.1, help="total variation loss weight")
+parser.add_argument("--lambda_ssim", type=float, default=0.1, help="structural similarity loss weight")
 parser.add_argument("--wb", type=int, default=1, help="weights and biases")
-
 opt = parser.parse_args()
-print(opt)
 
 if opt.wb:
     wandb.init(project="thesis", config=vars(opt))
@@ -52,10 +49,11 @@ criterion_GAN = torch.nn.MSELoss()
 criterion_cycle = torch.nn.L1Loss()
 criterion_identity = torch.nn.L1Loss()
 criterion_tv = TotalVariationLoss()
+criterion_ssim = SSIMLoss()
 
 cuda = torch.cuda.is_available()
 
-input_shape = (opt.channels, opt.img_height, opt.img_width)
+input_shape = (IMAGE_CHANNEL, IMAGE_WIDTH, IMAGE_HEIGHT)
 
 # Initialize generator and discriminator
 G_AB = GeneratorResNet(input_shape, opt.n_residual_blocks)
@@ -72,19 +70,12 @@ if cuda:
     criterion_cycle.cuda()
     criterion_identity.cuda()
     criterion_tv.cuda()
+    criterion_ssim.cuda()
 
-if opt.epoch != 0:
-    # Load pretrained models
-    G_AB.load_state_dict(torch.load("saved_models/%s/G_AB_%d.pth" % (opt.dataset_name, opt.epoch)))
-    G_BA.load_state_dict(torch.load("saved_models/%s/G_BA_%d.pth" % (opt.dataset_name, opt.epoch)))
-    D_A.load_state_dict(torch.load("saved_models/%s/D_A_%d.pth" % (opt.dataset_name, opt.epoch)))
-    D_B.load_state_dict(torch.load("saved_models/%s/D_B_%d.pth" % (opt.dataset_name, opt.epoch)))
-else:
-    # Initialize weights
-    G_AB.apply(weights_init_normal)
-    G_BA.apply(weights_init_normal)
-    D_A.apply(weights_init_normal)
-    D_B.apply(weights_init_normal)
+G_AB.apply(weights_init_normal)
+G_BA.apply(weights_init_normal)
+D_A.apply(weights_init_normal)
+D_B.apply(weights_init_normal)
 
 # Optimizers
 optimizer_G = torch.optim.Adam(
@@ -95,13 +86,13 @@ optimizer_D_B = torch.optim.Adam(D_B.parameters(), lr=opt.lr, betas=(opt.b1, opt
 
 # Learning rate update schedulers
 lr_scheduler_G = torch.optim.lr_scheduler.LambdaLR(
-    optimizer_G, lr_lambda=LambdaLR(opt.n_epochs, opt.epoch, opt.decay_epoch).step
+    optimizer_G, lr_lambda=LambdaLR(opt.epochs, opt.decay_epoch).step
 )
 lr_scheduler_D_A = torch.optim.lr_scheduler.LambdaLR(
-    optimizer_D_A, lr_lambda=LambdaLR(opt.n_epochs, opt.epoch, opt.decay_epoch).step
+    optimizer_D_A, lr_lambda=LambdaLR(opt.epochs, opt.decay_epoch).step
 )
 lr_scheduler_D_B = torch.optim.lr_scheduler.LambdaLR(
-    optimizer_D_B, lr_lambda=LambdaLR(opt.n_epochs, opt.epoch, opt.decay_epoch).step
+    optimizer_D_B, lr_lambda=LambdaLR(opt.epochs, opt.decay_epoch).step
 )
 
 Tensor = torch.cuda.FloatTensor if cuda else torch.Tensor
@@ -111,7 +102,7 @@ fake_A_buffer = ReplayBuffer()
 fake_B_buffer = ReplayBuffer()
 
 print('Loading datasets...')
-train_set = RGBTileDataset(dataset=opt.dataset_name, image_set="train")
+train_set = RGBTileDataset(dataset=opt.dataset_name, image_set="train", max_samples=5)
 test_set = RGBTileDataset(dataset=opt.dataset_name, image_set="test")
 train_dl = DataLoader(dataset=train_set, num_workers=opt.threads, batch_size=opt.batch_size, shuffle=True)
 test_dl = DataLoader(dataset=test_set, num_workers=opt.threads, batch_size=opt.batch_size, shuffle=False)
@@ -134,13 +125,12 @@ def sample_images(batches_done):
     image_grid = torch.cat((real_A, fake_B, real_B, fake_A), 1)
     save_image(image_grid, "images/%s/%s.png" % (opt.dataset_name, batches_done), normalize=False)
 
-
 # ----------
 #  Training
 # ----------
 
 prev_time = time.time()
-for epoch in range(opt.epoch, opt.n_epochs):
+for epoch in range(opt.epochs):
     for i, batch in enumerate(train_dl):
 
         # show_xyz(batch["A"].numpy(), cols=4)
@@ -186,14 +176,17 @@ for epoch in range(opt.epoch, opt.n_epochs):
         loss_cycle = (loss_cycle_A + loss_cycle_B) / 2
 
         # Total Variation loss
-        loss_tv_A = criterion_tv(fake_A)
-        loss_tv_B = criterion_tv(fake_B)
+        # loss_tv = criterion_tv(fake_A)  # do it onlym for the forward pass
 
-        loss_tv = (loss_tv_A + loss_tv_B) / 2
-        lambda_tv = 0.1
+        # Structural Similarity loss
+        loss_ssim = criterion_ssim(fake_B, real_B)  # compare what the generator_AB generated with the real B (RGB images)
 
-        # Total loss
-        loss_G = loss_GAN + opt.lambda_cyc * loss_cycle + opt.lambda_id * loss_identity + loss_tv * lambda_tv
+        # Total losses (generator)
+        loss_G =  loss_GAN
+        loss_G += opt.lambda_cyc * loss_cycle
+        loss_G += opt.lambda_id * loss_identity
+        # loss_G += loss_tv * opt.lambda_tv
+        loss_G += loss_ssim * opt.lambda_ssim
 
         loss_G.backward()
         optimizer_G.step()
@@ -201,6 +194,7 @@ for epoch in range(opt.epoch, opt.n_epochs):
         # -----------------------
         #  Train Discriminator A
         # -----------------------
+        # TODO: Freeze the discriminator weights 1/10
 
         optimizer_D_A.zero_grad()
 
@@ -240,24 +234,25 @@ for epoch in range(opt.epoch, opt.n_epochs):
 
         # Determine approximate time left
         batches_done = epoch * len(train_dl) + i
-        batches_left = opt.n_epochs * len(train_dl) - batches_done
+        batches_left = opt.epochs * len(train_dl) - batches_done
         time_left = datetime.timedelta(seconds=batches_left * (time.time() - prev_time))
         prev_time = time.time()
 
         if opt.wb:
-            wandb.log({"Loss_D": loss_D.item(), "Loss_G": loss_G.item(), "adv": loss_GAN.item(), "cycle": loss_cycle.item(), "identity": loss_identity.item()})
+            wandb.log({"Loss_D": loss_D.item(), "Loss_G": loss_G.item(), "ssim": loss_ssim.item(), "adv": loss_GAN.item(), "cycle": loss_cycle.item(), "identity": loss_identity.item()})
 
         # Print log
         sys.stdout.write(
-            "\r[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f, adv: %f, cycle: %f, identity: %f] ETA: %s"
+            "\r[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f, adv: %f, ssim: %f, cycle: %f, identity: %f] ETA: %s"
             % (
                 epoch,
-                opt.n_epochs,
+                opt.epochs,
                 i,
                 len(train_dl),
                 loss_D.item(),
                 loss_G.item(),
                 loss_GAN.item(),
+                loss_ssim.item(),
                 loss_cycle.item(),
                 loss_identity.item(),
                 time_left,
@@ -274,8 +269,9 @@ for epoch in range(opt.epoch, opt.n_epochs):
     lr_scheduler_D_A.step()
     lr_scheduler_D_B.step()
 
-    if opt.ckpt != -1 and epoch+1 % opt.ckpt == 0:
+    if opt.ckpt != -1 and epoch != 0 and epoch % opt.ckpt == 0:
         # Save model checkpoints
+        print("\nSaving models...")
         if opt.wb:
             saving_dir = os.path.join("saved_models", wandb.run.name)
             os.makedirs(saving_dir, exist_ok=True)
