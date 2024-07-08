@@ -103,6 +103,7 @@ if __name__ == "__main__":
     dataset_name = sys.argv[1]
     cluster = ImageHistogramClustering(dataset_name, n_clusters=2)
     cluster.cluster()
+    cluster.arrange_clustered_images()
 
-    splitter = Splitter(dataset_name=dataset_name, n_clusters=2, split_ratio=0.8, del_artifacts=True)
-    splitter.split()
+    # splitter = Splitter(dataset_name=dataset_name, n_clusters=2, split_ratio=0.8, del_artifacts=False)
+    # splitter.split()

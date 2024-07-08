@@ -84,10 +84,17 @@ class Tile:
 
     @staticmethod
     def _scale_xyz(xyz: np.ndarray) -> np.ndarray:
+        
+        # set min to 0
+        xyz = np.clip(xyz, 0, None, dtype=np.float32)
+
         # theoretically, we expect X and Y data values to be between 0-500 and Z between 0-50
         xyz[:, :, 0] = xyz[:, :, 0] / 500
         xyz[:, :, 1] = xyz[:, :, 1] / 500
         xyz[:, :, 2] = xyz[:, :, 2] / 50
+
+        # clip values to 0-1
+        xyz = np.clip(xyz, 0, 1, dtype=np.float32)
 
         return xyz
 
