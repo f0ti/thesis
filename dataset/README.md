@@ -11,4 +11,3 @@ For the ![melbourne dataset](https://) we have the following structure:
 - rgb_data - contains only the .png images extracted from tiles
 - xyz_data - contains the numpy arrays of the x, y, z coordinates
 - tiles_data - contains the tiles extracted on the agreed binary format
-- 
