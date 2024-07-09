@@ -9,7 +9,6 @@ import torch
 
 from torchvision.utils import save_image, make_grid
 from torch.utils.data import DataLoader
-from torch.autograd import Variable
 
 from utils import *
 from model import *
@@ -95,14 +94,12 @@ lr_scheduler_D_B = torch.optim.lr_scheduler.LambdaLR(
     optimizer_D_B, lr_lambda=LambdaLR(opt.epochs, opt.decay_epoch).step
 )
 
-Tensor = torch.cuda.FloatTensor if cuda else torch.Tensor
-
 # Buffers of previously generated samples
 fake_A_buffer = ReplayBuffer()
 fake_B_buffer = ReplayBuffer()
 
 print('Loading datasets...')
-train_set = RGBTileDataset(dataset=opt.dataset_name, image_set="train", max_samples=5)
+train_set = RGBTileDataset(dataset=opt.dataset_name, image_set="train")
 test_set = RGBTileDataset(dataset=opt.dataset_name, image_set="test")
 train_dl = DataLoader(dataset=train_set, num_workers=opt.threads, batch_size=opt.batch_size, shuffle=True)
 test_dl = DataLoader(dataset=test_set, num_workers=opt.threads, batch_size=opt.batch_size, shuffle=False)
@@ -112,9 +109,9 @@ def sample_images(batches_done):
     imgs = next(iter(test_dl))
     G_AB.eval()
     G_BA.eval()
-    real_A = Variable(imgs["A"].type(Tensor))
+    real_A = imgs["A"].cuda()
     fake_B = G_AB(real_A)
-    real_B = Variable(imgs["B"].type(Tensor))
+    real_B = imgs["B"].cuda()
     fake_A = G_BA(real_B)
     # Arange images along x-axis
     real_A = make_grid(real_A, nrow=5, normalize=True)
@@ -137,12 +134,12 @@ for epoch in range(opt.epochs):
         # show_rgb(batch["B"].numpy(), cols=4)
 
         # Set model input
-        real_A = Variable(batch["A"].type(Tensor))
-        real_B = Variable(batch["B"].type(Tensor))
+        real_A = batch["A"].cuda()
+        real_B = batch["B"].cuda()
 
         # Adversarial ground truths
-        valid = Variable(Tensor(np.ones((real_A.size(0), *D_A.output_shape))), requires_grad=False)
-        fake = Variable(Tensor(np.zeros((real_A.size(0), *D_A.output_shape))), requires_grad=False)
+        valid = torch.ones((real_A.size(0), *D_A.output_shape)).cuda()
+        fake = torch.zeros((real_A.size(0), *D_A.output_shape)).cuda()
 
         # ------------------
         #  Train Generators
@@ -272,7 +269,7 @@ for epoch in range(opt.epochs):
     if opt.ckpt != -1 and epoch != 0 and epoch % opt.ckpt == 0:
         # Save model checkpoints
         print("\nSaving models...")
-        if opt.wb:
+        if opt.wb and wandb.run is not None:
             saving_dir = os.path.join("saved_models", wandb.run.name)
             os.makedirs(saving_dir, exist_ok=True)
             torch.save(G_AB.state_dict(), os.path.join(saving_dir, f"G_AB_{epoch}.pth"))

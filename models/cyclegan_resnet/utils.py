@@ -89,3 +89,8 @@ class LambdaLR:
 
     def step(self, epoch):
         return 1.0 - max(0, epoch - self.decay_start_epoch) / (self.n_epochs - self.decay_start_epoch)
+
+
+def print_model_parameters(model):
+    for p in model.named_parameters():
+        print(p)

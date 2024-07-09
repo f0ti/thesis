@@ -1,8 +1,7 @@
 import torch
 import argparse
+import cudacanvas
 from torch.utils.data import DataLoader
-from torch.autograd import Variable
-from piq import vsi
 
 from utils import show_xyz, show_rgb, show_diff
 from data import RGBTileDataset
@@ -17,7 +16,7 @@ parser.add_argument("--n_residual_blocks", type=int, default=9, help="number of 
 parser.add_argument("--img_height", type=int, default=256, help="size of image height")
 parser.add_argument("--img_width", type=int, default=256, help="size of image width")
 parser.add_argument("--channels", type=int, default=3, help="number of image channels")
-parser.add_argument("--run_name", default="fancy-glitter-50", help="run name")
+parser.add_argument("--run_name", default="mild-fire-52", help="run name")
 opt = parser.parse_args()
 
 cuda = True if torch.cuda.is_available() else False
@@ -26,30 +25,26 @@ input_shape = (opt.channels, opt.img_height, opt.img_width)
 
 # load model
 model_path = "saved_models/%s/G_AB_%d.pth" % (opt.run_name, opt.nepochs)
-# model_path = "models_vault/G_AB_10.pth"
 model_g = GeneratorResNet(input_shape, opt.n_residual_blocks)
+
 if cuda:
     model_g.cuda()
 model_g.load_state_dict(torch.load(model_path))
 
-Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
-
 test_set = RGBTileDataset(dataset=opt.dataset_name, image_set="test")
 test_dl = DataLoader(dataset=test_set, num_workers=opt.threads, batch_size=opt.batch_size, shuffle=False)
 
-# print parameters
-for p in model_g.named_parameters():
-    print(p)
-
 for i, batch in enumerate(test_dl):
     # Model inputs
-    xyz_input = Variable(batch["A"].type(Tensor))
+    xyz_input = batch["A"].cuda()
     out_imgs = model_g(xyz_input)
     label = out_imgs.cpu().data
 
     # get Visual Saliency-induced Index (VSI)
     # vsi_score = vsi(label.type(Tensor), batch["B"].type(Tensor))
     # print(vsi_score)
+
+    # cudacanvas.im_show(xyz_input[0])
 
     # XYZ (only Z)
     show_xyz(batch["A"].numpy(), cols=2)
