@@ -1,5 +1,5 @@
 import torch
-from .custom_layers import (
+from custom_layers import (
     EqualizedConv2d,
     EqualizedConvTranspose2d,
     MinibatchStdDev,
@@ -107,13 +107,13 @@ class DisFinalBlock(torch.nn.Module):
 
 
 class ConDisFinalBlock(torch.nn.Module):
-    """ Final block for the Conditional Discriminator
-        Uses the Projection mechanism
-        from the paper -> https://arxiv.org/pdf/1802.05637.pdf
-        Args:
-            in_channels: number of input channels
-            num_classes: number of classes for conditional discrimination
-            use_eql: whether to use equalized learning rate
+    """Final block for the Conditional Discriminator
+    Uses the Projection mechanism
+    from the paper -> https://arxiv.org/pdf/1802.05637.pdf
+    Args:
+        in_channels: number of input channels
+        num_classes: number of classes for conditional discrimination
+        use_eql: whether to use equalized learning rate
     """
 
     def __init__(

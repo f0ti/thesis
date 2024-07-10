@@ -6,9 +6,9 @@ from pathlib import Path
 import torch
 from torch.backends import cudnn
 
-from data_tools import ImageDirectoryDataset, get_transform
+from data import RGBTileDataset, get_transform
 from gan import ProGAN
-from networks import Discriminator, Generator
+from networks import Discriminator, Generator, load_models
 from utils import str2bool, str2GANLoss
 
 # turn fast mode on
@@ -30,33 +30,24 @@ def parse_arguments() -> argparse.Namespace:
 
     # fmt: off
     # Required arguments (input path to the data and the output directory for saving training assets)
-    parser.add_argument("train_path", action="store", type=Path,
-                        help="Path to the images folder for training the ProGAN")
-    parser.add_argument("output_dir", action="store", type=Path,
+    parser.add_argument("--output_dir", action="store", type=Path, default=Path("./saved_models"), required=False,
                         help="Path to the directory for saving the logs and models")
-
-    # Optional arguments
-    # for retraining a model options:
-    parser.add_argument("--retrain", action="store", type=str2bool, default=False, required=False,
-                        help="whenever you want to resume training from saved models")
-    parser.add_argument("--generator_path", action="store", type=Path, required="--retrain" in sys.argv,
-                        help="Path to the generator model for retraining the ProGAN")
-    parser.add_argument("--discriminator_path", action="store", type=Path, required="--retrain" in sys.argv,
-                        help="Path to the discriminator model for retraining the ProGAN")
     
     # dataset related options:
-    parser.add_argument("--rec_dir", action="store", type=str2bool, default=False, required=False,
+    parser.add_argument("--rec_dir", action="store", type=str2bool, default=True, required=False,
                         help="whether images are stored under one folder or under a recursive dir structure")
-    parser.add_argument("--flip_horizontal", action="store", type=str2bool, default=True, required=False,
+    parser.add_argument("--flip_horizontal", action="store", type=str2bool, default=False, required=False,
                         help="whether to apply mirror (horizontal) augmentation")
 
     # model architecture related options:
+    # ************** IMPORTANT HYPERPARAMETER
     parser.add_argument("--depth", action="store", type=int, default=8, required=False,
                         help="depth of the generator and the discriminator. Starts from 2. "
                              "Example 2 --> (4x4) | 3 --> (8x8) ... | 10 --> (1024x1024)")
     parser.add_argument("--num_channels", action="store", type=int, default=3, required=False,
                         help="number of channels in the image data")
-    parser.add_argument("--latent_size", action="store", type=int, default=512, required=False,
+    # ************** IMPORTANT HYPERPARAMETER
+    parser.add_argument("--latent_size", action="store", type=int, default=256, required=False,
                         help="latent size of the generator and the discriminator")
 
     # training related options:
@@ -68,16 +59,20 @@ def parse_arguments() -> argparse.Namespace:
                              "the averaged one.")
     parser.add_argument("--ema_beta", action="store", type=float, default=0.999, required=False,
                         help="value of the ema beta")
+    
+    # ************** IMPORTANT HYPERPARAMETER
     parser.add_argument("--epochs", action="store", type=int, required=False, nargs="+",
-                        default=[42 for _ in range(9)],
+                        default=[5 for _ in range(7)],  # because there are 7 stages
                         help="number of epochs over the training dataset per stage")
+    # ************** IMPORTANT HYPERPARAMETER
     parser.add_argument("--batch_sizes", action="store", type=int, required=False, nargs="+",
-                        default=[32, 32, 32, 32, 16, 16, 8, 4, 2],
+                        default=[8, 8, 8, 4, 4, 2, 1],
                         help="batch size used for training the model per stage")
-    parser.add_argument("--batch_repeats", action="store", type=int, required=False, default=4,
+    # ************** IMPORTANT HYPERPARAMETER
+    parser.add_argument("--batch_repeats", action="store", type=int, required=False, default=2,
                         help="number of G and D steps executed per training iteration")
     parser.add_argument("--fade_in_percentages", action="store", type=int, required=False, nargs="+",
-                        default=[50 for _ in range(9)],
+                        default=[50 for _ in range(7)],
                         help="number of iterations for which fading of new layer happens. Measured in percentage")
     parser.add_argument("--loss_fn", action="store", type=str2GANLoss, required=False, default="wgan_gp",
                         help="loss function used for training the GAN. "
@@ -93,12 +88,13 @@ def parse_arguments() -> argparse.Namespace:
                              "Example 2 --> (4x4) | 3 --> (8x8) ... | 10 --> (1024x1024). "
                              "Note that this is not a way to restart a partial training. "
                              "Resuming is not supported currently. But will soon be.")
-    parser.add_argument("--num_workers", action="store", type=int, required=False, default=4,
+    parser.add_argument("--num_workers", action="store", type=int, required=False, default=8,
                         help="number of dataloader subprocesses. It's a pytorch thing, you can ignore it ;)."
                              " Leave it to the default value unless things are weirdly slow for you.")
     parser.add_argument("--feedback_factor", action="store", type=int, required=False, default=10,
                         help="number of feedback logs written per epoch")
-    parser.add_argument("--checkpoint_factor", action="store", type=int, required=False, default=10,
+    # ************** IMPORTANT HYPERPARAMETER
+    parser.add_argument("--checkpoint_factor", action="store", type=int, required=False, default=5,
                         help="number of epochs after which a model snapshot is saved per training stage")
     # fmt: on
 
@@ -115,27 +111,18 @@ def train_progan(args: argparse.Namespace) -> None:
     """
     print(f"Selected arguments: {args}")
 
-    if args.retrain:
-        print(f"Retraining the ProGAN: `depth`, `num_channels`, `latent_size`, `use_eql` parameters will be ignored if "
-              f"specified.")
-        generator, discriminator = load_models(args.generator_path, args.discriminator_path)
-        args.depth = generator.depth
-        args.num_channels = generator.num_channels
-        args.latent_size = generator.latent_size
-        args.use_eql = generator.use_eql
-    else:
-        generator = Generator(
-            depth=args.depth,
-            num_channels=args.num_channels,
-            latent_size=args.latent_size,
-            use_eql=args.use_eql,
-        )
-        discriminator = Discriminator(
-            depth=args.depth,
-            num_channels=args.num_channels,
-            latent_size=args.latent_size,
-            use_eql=args.use_eql,
-        )
+    generator = Generator(
+        depth=args.depth,
+        num_channels=args.num_channels,
+        latent_size=args.latent_size,
+        use_eql=args.use_eql,
+    )
+    discriminator = Discriminator(
+        depth=args.depth,
+        num_channels=args.num_channels,
+        latent_size=args.latent_size,
+        use_eql=args.use_eql,
+    )
 
     progan = ProGAN(
         generator,
@@ -146,13 +133,12 @@ def train_progan(args: argparse.Namespace) -> None:
     )
 
     progan.train(
-        dataset=ImageDirectoryDataset(
-            args.train_path,
+        dataset=RGBTileDataset(
+            image_set="train",
             transform=get_transform(
-                new_size=(int(2 ** args.depth), int(2 ** args.depth)),
+                new_size=(int(2**args.depth), int(2**args.depth)),
                 flip_horizontal=args.flip_horizontal,
             ),
-            rec_dir=args.rec_dir,
         ),
         epochs=args.epochs,
         batch_sizes=args.batch_sizes,

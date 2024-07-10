@@ -1,12 +1,12 @@
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 import torch
 
 import torch as th
-from .custom_layers import EqualizedConv2d
-from .modules import (
+from custom_layers import EqualizedConv2d
+from modules import (
     ConDisFinalBlock,
     DisFinalBlock,
     DisGeneralConvBlock,
@@ -20,10 +20,10 @@ from torch.nn.functional import avg_pool2d, interpolate
 
 def nf(
     stage: int,
-    fmap_base: int = 16 << 10,
+    fmap_base: int = 16 << 8,
     fmap_decay: float = 1.0,
     fmap_min: int = 1,
-    fmap_max: int = 512,
+    fmap_max: int = 256,
 ) -> int:
     """
     computes the number of fmaps present in each stage
@@ -57,9 +57,9 @@ class Generator(th.nn.Module):
 
     def __init__(
         self,
-        depth: int = 10,
+        depth: int = 8,
         num_channels: int = 3,
-        latent_size: int = 512,
+        latent_size: int = 256,
         use_eql: bool = True,
     ) -> None:
         super().__init__()
@@ -246,8 +246,8 @@ def create_discriminator_from_saved_model(saved_model_path: Path) -> Discriminat
     loaded_data = torch.load(saved_model_path)
 
     # create a discriminator from the loaded data:
-    discriminator_data = (
-        loaded_data.get("shadow_discriminator", loaded_data["discriminator"])
+    discriminator_data = loaded_data.get(
+        "shadow_discriminator", loaded_data["discriminator"]
     )
     discriminator = Discriminator(**discriminator_data["conf"])
     discriminator.load_state_dict(discriminator_data["state_dict"])
@@ -255,7 +255,9 @@ def create_discriminator_from_saved_model(saved_model_path: Path) -> Discriminat
     return discriminator
 
 
-def load_models(generator_path: Path, discriminator_path: Path) -> Tuple[Generator, Discriminator]:
+def load_models(
+    generator_path: Path, discriminator_path: Path
+) -> Tuple[Generator, Discriminator]:
     generator = create_generator_from_saved_model(generator_path)
     discriminator = create_discriminator_from_saved_model(discriminator_path)
     return generator, discriminator

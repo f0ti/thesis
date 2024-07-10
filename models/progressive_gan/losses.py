@@ -1,11 +1,12 @@
 """ Module implementing various loss functions """
+
 from typing import Optional
 
 import torch
 from torch import Tensor
 from torch.nn import BCEWithLogitsLoss
 
-from .networks import Discriminator
+from networks import Discriminator
 
 
 class GANLoss:
@@ -189,7 +190,7 @@ class WganGP(GANLoss):
         loss = (
             torch.mean(fake_scores)
             - torch.mean(real_scores)
-            + (self.drift * torch.mean(real_scores ** 2))
+            + (self.drift * torch.mean(real_scores**2))
         )
 
         # calculate the WGAN-GP (gradient penalty)

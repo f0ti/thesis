@@ -12,8 +12,8 @@ from losses import WganGP, StandardGAN
 
 def adjust_dynamic_range(
     data: Tensor,
-    drange_in: Optional[Tuple[float, float]] = (-1.0, 1.0),
-    drange_out: Optional[Tuple[float, float]] = (0.0, 1.0),
+    drange_in: Optional[Tuple[float, float]] = (0.0, 1.0),
+    drange_out: Optional[Tuple[float, float]] = (-1.0, 1.0),
 ):
     if drange_in != drange_out:
         scale = (np.float32(drange_out[1]) - np.float32(drange_out[0])) / (

@@ -1,6 +1,7 @@
 """ Module implementing ProGAN which is trained using the Progressive growing
     technique -> https://arxiv.org/abs/1710.10196
 """
+
 import copy
 import datetime
 import time
@@ -16,14 +17,14 @@ from torch.nn import DataParallel, Module
 from torch.nn.functional import avg_pool2d, interpolate
 from torch.optim.optimizer import Optimizer
 from torch.utils.data import Dataset
-from torch.utils.tensorboard import SummaryWriter
+from torch.utils.tensorboard.writer import SummaryWriter
 from torchvision.utils import save_image
 
-from .custom_layers import update_average
-from .data_tools import get_data_loader
-from .losses import GANLoss, WganGP
-from .networks import Discriminator, Generator
-from .utils import adjust_dynamic_range
+from custom_layers import update_average
+from data import get_data_loader
+from losses import GANLoss, WganGP
+from networks import Discriminator, Generator
+from utils import adjust_dynamic_range
 
 
 class ProGAN:
@@ -31,7 +32,7 @@ class ProGAN:
         self,
         gen: Generator,
         dis: Discriminator,
-        device=torch.device("cpu"),
+        device=torch.device("cuda"),
         use_ema: bool = True,
         ema_beta: float = 0.999,
     ):
@@ -55,12 +56,14 @@ class ProGAN:
         print(f"Generator Network: {self.gen}")
         print(f"Discriminator Network: {self.dis}")
 
+        # instead of using the optimized parameters from the final training
+        # iteration (parameter update step) as the final parameters for the
+        # model, the exponential moving average of the parameters over the
+        # course of all the training iterations are used.
         if self.use_ema:
             # create a shadow copy of the generator
             self.gen_shadow = copy.deepcopy(self.gen)
-
-            # initialize the gen_shadow weights equal to the
-            # weights of gen
+            # initialize the gen_shadow weights equal to the weights of gen
             update_average(self.gen_shadow, self.gen, beta=0)
 
         # counters to maintain generator and discriminator gradient overflows
@@ -207,12 +210,12 @@ class ProGAN:
         # upsample the image
         if scale_factor > 1:
             samples = interpolate(samples, scale_factor=scale_factor)
-
+        
         samples = adjust_dynamic_range(
             samples, drange_in=(-1.0, 1.0), drange_out=(0.0, 1.0)
         )
 
-        # save the images:
+        # save the images
         save_image(samples, img_file, nrow=int(np.sqrt(len(samples))), padding=0)
 
     def _toggle_all_networks(self, mode="train"):
@@ -276,7 +279,7 @@ class ProGAN:
         start_depth: int = 2,
         num_workers: int = 3,
         feedback_factor: int = 100,
-        save_dir=Path("./train"),
+        save_dir=Path("./saved_models"),
         checkpoint_factor: int = 10,
     ):
         """
@@ -307,7 +310,7 @@ class ProGAN:
         Returns: None (Writes multiple files to disk)
         """
 
-        print(f"Loaded the dataset with: {len(dataset)} images ...")
+        print(f"Loaded the dataset with: {len(dataset)} images ...")  # type: ignore
         assert (self.depth - 1) == len(
             batch_sizes
         ), "batch_sizes are not compatible with depth"
@@ -337,21 +340,21 @@ class ProGAN:
 
         feedback_generator = self.gen_shadow if self.use_ema else self.gen
 
-        # image saving mechanism
-        with torch.no_grad():
-            dummy_data_loader = get_data_loader(dataset, num_samples, num_workers)
-            real_images_for_render = next(iter(dummy_data_loader))
-            fixed_input = torch.randn(num_samples, self.latent_size).to(self.device)
-            self.create_grid(
-                real_images_for_render,
-                scale_factor=1,
-                img_file=log_dir / "real_images.png",
-            )
-            self.create_grid(
-                feedback_generator(fixed_input, self.depth, 1).detach(),
-                scale_factor=1,
-                img_file=log_dir / "fake_images_0.png",
-            )
+        # # image saving mechanism
+        # with torch.no_grad():
+        #     dummy_data_loader = get_data_loader(dataset, num_samples, num_workers)
+        #     real_images_for_render = next(iter(dummy_data_loader))
+        #     fixed_input = torch.randn(num_samples, self.latent_size).to(self.device)
+        #     self.create_grid(
+        #         real_images_for_render,
+        #         scale_factor=1,
+        #         img_file=log_dir / "real_images.png",
+        #     )
+        #     self.create_grid(
+        #         feedback_generator(fixed_input, self.depth, 1).detach(),
+        #         scale_factor=1,
+        #         img_file=log_dir / "fake_images_0.png",
+        #     )
 
         # tensorboard summarywriter:
         summary = SummaryWriter(str(log_dir / "tensorboard"))
@@ -362,7 +365,7 @@ class ProGAN:
 
         print("Starting the training process ... ")
         for current_depth in range(start_depth, self.depth + 1):
-            current_res = int(2 ** current_depth)
+            current_res = int(2**current_depth)
             print(f"\n\nCurrently working on Depth: {current_depth}")
             print("Current resolution: %d x %d" % (current_res, current_res))
             depth_list_index = current_depth - 2
@@ -381,16 +384,13 @@ class ProGAN:
                     * total_batches
                 )
 
-                for (i, batch) in enumerate(data, start=1):
+                for i, batch in enumerate(data, start=1):
                     # calculate the alpha for fading in the layers
                     alpha = ticker / fader_point if ticker <= fader_point else 1
 
                     # extract current batch of data for training
-                    images = batch.to(self.device)
-
-                    gan_input = torch.randn(current_batch_size, self.latent_size).to(
-                        self.device
-                    )
+                    gan_input = batch['A'].to(self.device)
+                    images = batch['B'].to(self.device)
 
                     gen_loss, dis_loss = None, None
                     for _ in range(batch_repeats):
@@ -432,7 +432,7 @@ class ProGAN:
                             "gen_loss", gen_loss, global_step=global_step
                         )
                         # create a grid of samples and save it
-                        resolution_dir = log_dir / str(int(2 ** current_depth))
+                        resolution_dir = log_dir / str(int(2**current_depth))
                         resolution_dir.mkdir(exist_ok=True)
                         gen_img_file = resolution_dir / f"{epoch}_{i}.png"
 

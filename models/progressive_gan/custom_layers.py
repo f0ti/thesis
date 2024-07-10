@@ -1,4 +1,5 @@
 """ Module contains custom layers """
+
 from typing import Any
 
 import numpy as np
