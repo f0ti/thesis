@@ -7,7 +7,6 @@ import torch
 import torch as th
 from custom_layers import EqualizedConv2d
 from modules import (
-    ConDisFinalBlock,
     DisFinalBlock,
     DisGeneralConvBlock,
     GenGeneralConvBlock,
@@ -20,7 +19,7 @@ from torch.nn.functional import avg_pool2d, interpolate
 
 def nf(
     stage: int,
-    fmap_base: int = 16 << 8,
+    fmap_base: int = 16 << 8,  # 8 because depth=8
     fmap_decay: float = 1.0,
     fmap_min: int = 1,
     fmap_max: int = 256,
@@ -46,7 +45,7 @@ def nf(
 
 
 class Generator(th.nn.Module):
-    """
+    """explain this what
     Generator Module (block) of the GAN network
     Args:
         depth: required depth of the Network (**starts from 2)
@@ -59,21 +58,19 @@ class Generator(th.nn.Module):
         self,
         depth: int = 8,
         num_channels: int = 3,
-        latent_size: int = 256,
         use_eql: bool = True,
     ) -> None:
         super().__init__()
 
         # object state:
         self.depth = depth
-        self.latent_size = latent_size
         self.num_channels = num_channels
         self.use_eql = use_eql
 
         ConvBlock = EqualizedConv2d if use_eql else Conv2d
 
         self.layers = ModuleList(
-            [GenInitialBlock(latent_size, nf(1), use_eql=self.use_eql)]
+            [GenInitialBlock(self.num_channels, nf(1), use_eql=self.use_eql)]
         )
         for stage in range(1, depth - 1):
             self.layers.append(GenGeneralConvBlock(nf(stage), nf(stage + 1), use_eql))
@@ -100,7 +97,7 @@ class Generator(th.nn.Module):
         depth = self.depth if depth is None else depth
         assert depth <= self.depth, f"Requested output depth {depth} cannot be produced"
 
-        if depth == 2:
+        if depth == 2:  # if it is the first block
             y = self.rgb_converters[0](self.layers[0](x))
         else:
             y = x
@@ -116,7 +113,6 @@ class Generator(th.nn.Module):
             "conf": {
                 "depth": self.depth,
                 "num_channels": self.num_channels,
-                "latent_size": self.latent_size,
                 "use_eql": self.use_eql,
             },
             "state_dict": self.state_dict(),
@@ -137,9 +133,9 @@ class Discriminator(th.nn.Module):
 
     def __init__(
         self,
-        depth: int = 7,
+        depth: int = 8,
         num_channels: int = 3,
-        latent_size: int = 512,
+        latent_size: int = 256,
         use_eql: bool = True,
         num_classes: Optional[int] = None,
     ) -> None:
@@ -149,14 +145,10 @@ class Discriminator(th.nn.Module):
         self.latent_size = latent_size
         self.use_eql = use_eql
         self.num_classes = num_classes
-        self.conditional = num_classes is not None
 
         ConvBlock = EqualizedConv2d if use_eql else Conv2d
 
-        if self.conditional:
-            self.layers = [ConDisFinalBlock(nf(1), latent_size, num_classes, use_eql)]
-        else:
-            self.layers = [DisFinalBlock(nf(1), latent_size, use_eql)]
+        self.layers = [DisFinalBlock(nf(1), self.latent_size, use_eql)]
 
         for stage in range(1, depth - 1):
             self.layers.insert(
@@ -193,9 +185,6 @@ class Discriminator(th.nn.Module):
             depth <= self.depth
         ), f"Requested output depth {depth} cannot be evaluated"
 
-        if self.conditional:
-            assert labels is not None, "Conditional discriminator required labels"
-
         if depth > 2:
             residual = self.from_rgb[-(depth - 2)](
                 avg_pool2d(x, kernel_size=2, stride=2)
@@ -206,10 +195,8 @@ class Discriminator(th.nn.Module):
                 y = layer_block(y)
         else:
             y = self.from_rgb[-1](x)
-        if self.conditional:
-            y = self.layers[-1](y, labels)
-        else:
-            y = self.layers[-1](y)
+
+        y = self.layers[-1](y)
         return y
 
     def get_save_info(self) -> Dict[str, Any]:
@@ -219,7 +206,6 @@ class Discriminator(th.nn.Module):
                 "num_channels": self.num_channels,
                 "latent_size": self.latent_size,
                 "use_eql": self.use_eql,
-                "num_classes": self.num_classes,
             },
             "state_dict": self.state_dict(),
         }

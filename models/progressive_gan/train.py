@@ -66,7 +66,7 @@ def parse_arguments() -> argparse.Namespace:
                         help="number of epochs over the training dataset per stage")
     # ************** IMPORTANT HYPERPARAMETER
     parser.add_argument("--batch_sizes", action="store", type=int, required=False, nargs="+",
-                        default=[8, 8, 8, 4, 4, 2, 1],
+                        default=[8, 8, 8, 4, 4, 2, 1],  # (4x4), (8x8), (16x16), (32x32), (64x64), (128x128), (256x256)
                         help="batch size used for training the model per stage")
     # ************** IMPORTANT HYPERPARAMETER
     parser.add_argument("--batch_repeats", action="store", type=int, required=False, default=2,
@@ -114,7 +114,6 @@ def train_progan(args: argparse.Namespace) -> None:
     generator = Generator(
         depth=args.depth,
         num_channels=args.num_channels,
-        latent_size=args.latent_size,
         use_eql=args.use_eql,
     )
     discriminator = Discriminator(

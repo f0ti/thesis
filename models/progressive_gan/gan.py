@@ -33,7 +33,7 @@ class ProGAN:
         gen: Generator,
         dis: Discriminator,
         device=torch.device("cuda"),
-        use_ema: bool = True,
+        use_ema: bool = False,
         ema_beta: float = 0.999,
     ):
         assert gen.depth == dis.depth, (
@@ -45,7 +45,6 @@ class ProGAN:
         self.use_ema = use_ema
         self.ema_beta = ema_beta
         self.depth = gen.depth
-        self.latent_size = gen.latent_size
         self.device = device
 
         # if code is to be run on GPU, we can use DataParallel:
@@ -112,11 +111,10 @@ class ProGAN:
         self,
         loss: GANLoss,
         dis_optim: Optimizer,
-        noise: Tensor,
+        input_data: Tensor,
         real_batch: Tensor,
         depth: int,
         alpha: float,
-        labels: Optional[Tensor] = None,
     ) -> float:
         """
         performs a single weight update step on discriminator using the batch of data
@@ -135,9 +133,9 @@ class ProGAN:
         real_samples = self.progressive_downsample_batch(real_batch, depth, alpha)
 
         # generate a batch of samples
-        fake_samples = self.gen(noise, depth, alpha).detach()
+        fake_samples = self.gen(input_data, depth, alpha).detach()
         dis_loss = loss.dis_loss(
-            self.dis, real_samples, fake_samples, depth, alpha, labels=labels
+            self.dis, real_samples, fake_samples, depth, alpha
         )
 
         # optimize discriminator
@@ -368,7 +366,7 @@ class ProGAN:
             current_res = int(2**current_depth)
             print(f"\n\nCurrently working on Depth: {current_depth}")
             print("Current resolution: %d x %d" % (current_res, current_res))
-            depth_list_index = current_depth - 2
+            depth_list_index = current_depth - 2  # start index from 0
             current_batch_size = batch_sizes[depth_list_index]
             data = get_data_loader(dataset, current_batch_size, num_workers)
             ticker = 1
@@ -437,14 +435,14 @@ class ProGAN:
                         gen_img_file = resolution_dir / f"{epoch}_{i}.png"
 
                         # this is done to allow for more GPU space
-                        with torch.no_grad():
-                            self.create_grid(
-                                samples=feedback_generator(
-                                    fixed_input, current_depth, alpha
-                                ).detach(),
-                                scale_factor=int(2 ** (self.depth - current_depth)),
-                                img_file=gen_img_file,
-                            )
+                        # with torch.no_grad():
+                        #     self.create_grid(
+                        #         samples=feedback_generator(
+                        #             fixed_input, current_depth, alpha
+                        #         ).detach(),
+                        #         scale_factor=int(2 ** (self.depth - current_depth)),
+                        #         img_file=gen_img_file,
+                        #     )
 
                     # increment the alpha ticker and the step
                     ticker += 1
