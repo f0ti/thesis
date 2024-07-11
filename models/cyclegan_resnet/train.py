@@ -17,7 +17,7 @@ from data import *
 from config import *
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--epochs", type=int, default=11, help="number of epochs of training")
+parser.add_argument("--epochs", type=int, default=7, help="number of epochs of training")
 parser.add_argument("--dataset_name", type=str, default="melbourne-top", help="name of the dataset")
 parser.add_argument("--batch_size", type=int, default=1, help="size of the batches")
 parser.add_argument("--lr", type=float, default=0.0002, help="adam: learning rate")
@@ -28,10 +28,11 @@ parser.add_argument("--threads", type=int, default=16, help="number of cpu threa
 parser.add_argument("--sample_interval", type=int, default=0, help="interval between saving generator outputs")
 parser.add_argument("--ckpt", type=int, default=2, help="interval between saving model checkpoints")
 parser.add_argument("--n_residual_blocks", type=int, default=9, help="number of residual blocks in generator")
-parser.add_argument("--lambda_cyc", type=float, default=10.0, help="cycle loss weight")
+parser.add_argument("--lambda_cyc", type=float, default=8.0, help="cycle loss weight")
 parser.add_argument("--lambda_id", type=float, default=5.0, help="identity loss weight")
 parser.add_argument("--lambda_tv", type=float, default=0.1, help="total variation loss weight")
-parser.add_argument("--lambda_ssim", type=float, default=0.1, help="structural similarity loss weight")
+parser.add_argument("--lambda_ssim", type=float, default=1.0, help="structural similarity loss weight")
+parser.add_argument("--lambda_sdi", type=float, default=1.0, help="structural distortion index loss weight")
 parser.add_argument("--wb", type=int, default=1, help="weights and biases")
 opt = parser.parse_args()
 
@@ -49,6 +50,7 @@ criterion_cycle = torch.nn.L1Loss()
 criterion_identity = torch.nn.L1Loss()
 criterion_tv = TotalVariationLoss()
 criterion_ssim = SSIMLoss()
+criterion_sdi = SDILoss()
 
 cuda = torch.cuda.is_available()
 
@@ -70,6 +72,7 @@ if cuda:
     criterion_identity.cuda()
     criterion_tv.cuda()
     criterion_ssim.cuda()
+    criterion_sdi.cuda()
 
 G_AB.apply(weights_init_normal)
 G_BA.apply(weights_init_normal)
@@ -178,11 +181,15 @@ for epoch in range(opt.epochs):
         # Structural Similarity loss
         loss_ssim = criterion_ssim(fake_B, real_B)  # compare what the generator_AB generated with the real B (RGB images)
 
+        # Structural Distortion Index loss
+        loss_sdi = criterion_sdi(fake_B, real_B)  # compare what the generator_AB generated with the real B (RGB images)
+
         # Total losses (generator)
         loss_G =  loss_GAN
         loss_G += opt.lambda_cyc * loss_cycle
         loss_G += opt.lambda_id * loss_identity
         # loss_G += loss_tv * opt.lambda_tv
+        loss_G += loss_sdi * opt.lambda_sdi
         loss_G += loss_ssim * opt.lambda_ssim
 
         loss_G.backward()
@@ -236,11 +243,11 @@ for epoch in range(opt.epochs):
         prev_time = time.time()
 
         if opt.wb:
-            wandb.log({"Loss_D": loss_D.item(), "Loss_G": loss_G.item(), "ssim": loss_ssim.item(), "adv": loss_GAN.item(), "cycle": loss_cycle.item(), "identity": loss_identity.item()})
+            wandb.log({"Loss_D": loss_D.item(), "Loss_G": loss_G.item(), "ssim": loss_ssim.item(), "sdi": loss_sdi.item(), "adv": loss_GAN.item(), "cycle": loss_cycle.item(), "identity": loss_identity.item()})
 
         # Print log
         sys.stdout.write(
-            "\r[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f, adv: %f, ssim: %f, cycle: %f, identity: %f] ETA: %s"
+            "\r[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f, adv: %f, sdi: %f, cycle: %f, identity: %f] ETA: %s"
             % (
                 epoch,
                 opt.epochs,
@@ -249,7 +256,8 @@ for epoch in range(opt.epochs):
                 loss_D.item(),
                 loss_G.item(),
                 loss_GAN.item(),
-                loss_ssim.item(),
+                loss_sdi.item(),
+                # loss_ssim.item(),
                 loss_cycle.item(),
                 loss_identity.item(),
                 time_left,

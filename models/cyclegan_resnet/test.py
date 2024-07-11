@@ -1,6 +1,5 @@
 import torch
 import argparse
-import cudacanvas
 from torch.utils.data import DataLoader
 
 from utils import show_xyz, show_rgb, show_diff
@@ -43,8 +42,6 @@ for i, batch in enumerate(test_dl):
     # get Visual Saliency-induced Index (VSI)
     # vsi_score = vsi(label.type(Tensor), batch["B"].type(Tensor))
     # print(vsi_score)
-
-    # cudacanvas.im_show(xyz_input[0])
 
     # XYZ (only Z)
     show_xyz(batch["A"].numpy(), cols=2)
