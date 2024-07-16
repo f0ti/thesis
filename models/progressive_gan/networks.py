@@ -21,7 +21,7 @@ def nf(
     stage: int,
     fmap_base: int = 16 << 8,  # 8 because depth=8
     fmap_decay: float = 1.0,
-    fmap_min: int = 1,
+    fmap_min: int = 8,
     fmap_max: int = 256,
 ) -> int:
     """
@@ -42,7 +42,6 @@ def nf(
             fmap_max,
         ).item()
     )
-
 
 class Generator(th.nn.Module):
     """explain this what
@@ -75,6 +74,7 @@ class Generator(th.nn.Module):
         for stage in range(1, depth - 1):
             self.layers.append(GenGeneralConvBlock(nf(stage), nf(stage + 1), use_eql))
 
+        # convert any feature map to RGB image
         self.rgb_converters = ModuleList(
             [
                 ConvBlock(nf(stage), num_channels, kernel_size=(1, 1))
@@ -197,6 +197,7 @@ class Discriminator(th.nn.Module):
             y = self.from_rgb[-1](x)
 
         y = self.layers[-1](y)
+        print(y)
         return y
 
     def get_save_info(self) -> Dict[str, Any]:

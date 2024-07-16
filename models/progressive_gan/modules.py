@@ -25,6 +25,7 @@ class GenInitialBlock(Module):
 
         ConvBlock = EqualizedConv2d if use_eql else Conv2d
 
+        # bring the input feature maps based on the paper (depth=2)
         self.conv1 = ConvBlock(in_channels, 64, kernel_size=7, stride=2, padding=3)     # 64 x 128 x 128
         self.conv2 = ConvBlock(64, 128, kernel_size=5, stride=2, padding=2)             # 128 x 64 x 64
         self.conv3 = ConvBlock(128, 128, kernel_size=5, stride=4, padding=1)            # 128 x 16 x 16
@@ -104,7 +105,6 @@ class DisFinalBlock(torch.nn.Module):
         y = self.lrelu(self.conv_1(y))
         y = self.lrelu(self.conv_2(y))
         y = self.conv_3(y)
-        print("Discriminator y shape: ", y.shape)
         y = y.view(-1)
         return y
 

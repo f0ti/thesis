@@ -67,16 +67,11 @@ class StandardGAN(GANLoss):
         real_samples: Tensor,
         fake_samples: Tensor,
         depth: int,
-        alpha: float,
-        labels: Optional[Tensor] = None,
+        alpha: float
     ) -> Tensor:
-        if labels is not None:
-            assert discriminator.conditional, "labels passed to an unconditional dis"
-            real_scores = discriminator(real_samples, depth, alpha, labels)
-            fake_scores = discriminator(fake_samples, depth, alpha, labels)
-        else:
-            real_scores = discriminator(real_samples, depth, alpha)
-            fake_scores = discriminator(fake_samples, depth, alpha)
+        
+        real_scores = discriminator(real_samples, depth, alpha)
+        fake_scores = discriminator(fake_samples, depth, alpha)
 
         real_loss = self.criterion(
             real_scores, torch.ones(real_scores.shape).to(real_scores.device)
