@@ -108,6 +108,7 @@ class Discriminator(nn.Module):
             if normalize:
                 layers.append(nn.InstanceNorm2d(out_filters))
             layers.append(nn.LeakyReLU(0.2, inplace=True))
+            
             return layers
 
         self.model = nn.Sequential(
@@ -116,8 +117,10 @@ class Discriminator(nn.Module):
             *discriminator_block(128, 256),
             *discriminator_block(256, 512),
             nn.ZeroPad2d((1, 0, 1, 0)),
-            nn.Conv2d(512, 1, 4, padding=1)
+            nn.Conv2d(512, 1, 4, padding=1)  # PatchGAN outputs 16x16
         )
 
-    def forward(self, img):
-        return self.model(img)
+    def forward(self, x):
+        x = self.model(x)
+        print(x)
+        return x

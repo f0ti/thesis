@@ -4,6 +4,7 @@ import numpy as np
 import itertools
 import datetime
 import time
+import sys
 import wandb
 import torch
 
@@ -24,7 +25,7 @@ parser.add_argument("--lr", type=float, default=0.0002, help="adam: learning rat
 parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")
 parser.add_argument("--b2", type=float, default=0.999, help="adam: decay of first order momentum of gradient")
 parser.add_argument("--decay_epoch", type=int, default=0, help="epoch from which to start lr decay")
-parser.add_argument("--threads", type=int, default=16, help="number of cpu threads to use during batch generation")
+parser.add_argument("--threads", type=int, default=8, help="number of cpu threads to use during batch generation")
 parser.add_argument("--sample_interval", type=int, default=0, help="interval between saving generator outputs")
 parser.add_argument("--ckpt", type=int, default=2, help="interval between saving model checkpoints")
 parser.add_argument("--n_residual_blocks", type=int, default=9, help="number of residual blocks in generator")
