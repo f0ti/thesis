@@ -62,16 +62,14 @@ class GenGeneralConvBlock(torch.nn.Module):
         ConvBlock = EqualizedConv2d if use_eql else Conv2d
 
         self.conv_1 = ConvBlock(in_channels, out_channels, (3, 3), padding=1, bias=True)
-        self.conv_2 = ConvBlock(
-            out_channels, out_channels, (3, 3), padding=1, bias=True
-        )
+        self.conv_2 = ConvBlock(out_channels, out_channels, (3, 3), padding=1, bias=True)
         self.pixNorm = PixelwiseNorm()
         self.lrelu = LeakyReLU(0.2)
 
     def forward(self, x: Tensor) -> Tensor:
-        y = interpolate(x, scale_factor=2)
-        y = self.pixNorm(self.lrelu(self.conv_1(y)))
-        y = self.pixNorm(self.lrelu(self.conv_2(y)))
+        y = interpolate(x, scale_factor=2)  # upsample
+        y = self.pixNorm(self.lrelu(self.conv_1(y)))  # convolution 3x3
+        y = self.pixNorm(self.lrelu(self.conv_2(y)))  # convolution 3x3
 
         return y
 
@@ -101,7 +99,7 @@ class DisFinalBlock(torch.nn.Module):
         self.lrelu = LeakyReLU(0.2)
         
     def forward(self, x: Tensor) -> Tensor:
-        y = self.batch_discriminator(x)
+        y = self.batch_discriminator(x)  # this adds one more feature map to the input
         y = self.lrelu(self.conv_1(y))
         y = self.lrelu(self.conv_2(y))
         y = self.conv_3(y)

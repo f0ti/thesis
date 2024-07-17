@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, List
 
 import numpy as np
 import torch
@@ -21,7 +21,7 @@ def nf(
     stage: int,
     fmap_base: int = 16 << 8,  # 8 because depth=8
     fmap_decay: float = 1.0,
-    fmap_min: int = 8,
+    fmap_min: int = 4,
     fmap_max: int = 256,
 ) -> int:
     """
@@ -52,6 +52,14 @@ class Generator(th.nn.Module):
         latent_size: size of the latent manifold
         use_eql: whether to use equalized learning rate
     """
+    # nf(1) = 256
+    # nf(2) = 256
+    # nf(3) = 256
+    # nf(4) = 256
+    # nf(5) = 256
+    # nf(6) = 128
+    # nf(7) = 64
+    # nf(8) = 32
 
     def __init__(
         self,
@@ -68,10 +76,14 @@ class Generator(th.nn.Module):
 
         ConvBlock = EqualizedConv2d if use_eql else Conv2d
 
+        # the initial block for the generator
         self.layers = ModuleList(
             [GenInitialBlock(self.num_channels, nf(1), use_eql=self.use_eql)]
         )
+
+        # subsequent blocks for the generator
         for stage in range(1, depth - 1):
+            # upsample, conv3x3, conv3x3
             self.layers.append(GenGeneralConvBlock(nf(stage), nf(stage + 1), use_eql))
 
         # convert any feature map to RGB image
@@ -98,11 +110,15 @@ class Generator(th.nn.Module):
         assert depth <= self.depth, f"Requested output depth {depth} cannot be produced"
 
         if depth == 2:  # if it is the first block
+            # forward x through the first layer and then convert it to RGB
             y = self.rgb_converters[0](self.layers[0](x))
         else:
             y = x
+            # forward pass the input over the layers until depth-2
             for layer_block in self.layers[: depth - 2]:
                 y = layer_block(y)
+            # need to interpolate the output to the required resolution,
+            # because the output is from a lower resolution from the previous layer
             residual = interpolate(self.rgb_converters[depth - 3](y), scale_factor=2)
             straight = self.rgb_converters[depth - 2](self.layers[depth - 2](y))
             y = (alpha * straight) + ((1 - alpha) * residual)
@@ -168,7 +184,7 @@ class Discriminator(th.nn.Module):
         )
 
     def forward(
-        self, x: Tensor, depth: int, alpha: float, labels: Optional[Tensor] = None
+        self, x: Tensor, depth: int, alpha: float
     ) -> Tensor:
         """
         forward pass of the discriminator
@@ -181,23 +197,22 @@ class Discriminator(th.nn.Module):
 
         Returns: raw discriminator scores
         """
-        assert (
-            depth <= self.depth
-        ), f"Requested output depth {depth} cannot be evaluated"
+        assert (depth <= self.depth), f"Requested output depth {depth} cannot be evaluated"
 
         if depth > 2:
+            # start from the last layer and move towards the first layer
             residual = self.from_rgb[-(depth - 2)](
                 avg_pool2d(x, kernel_size=2, stride=2)
             )
             straight = self.layers[-(depth - 1)](self.from_rgb[-(depth - 1)](x))
             y = (alpha * straight) + ((1 - alpha) * residual)
+            
             for layer_block in self.layers[-(depth - 2) : -1]:
                 y = layer_block(y)
         else:
             y = self.from_rgb[-1](x)
 
         y = self.layers[-1](y)
-        print(y)
         return y
 
     def get_save_info(self) -> Dict[str, Any]:

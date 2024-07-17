@@ -3,17 +3,17 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 import numpy as np
-
 import torch
 from torch import Tensor
 
+import losses
 from losses import WganGP, StandardGAN
 
 
 def adjust_dynamic_range(
     data: Tensor,
-    drange_in: Optional[Tuple[float, float]] = (0.0, 1.0),
-    drange_out: Optional[Tuple[float, float]] = (-1.0, 1.0),
+    drange_in: Tuple[float, float] = (0.0, 1.0),
+    drange_out: Tuple[float, float] = (-1.0, 1.0),
 ):
     if drange_in != drange_out:
         scale = (np.float32(drange_out[1]) - np.float32(drange_out[0])) / (
@@ -25,7 +25,7 @@ def adjust_dynamic_range(
     return torch.clamp(data, min=drange_out[0], max=drange_out[1])
 
 
-def post_process_generated_images(imgs: Tensor) -> np.array:
+def post_process_generated_images(imgs: Tensor) -> np.ndarray:
     imgs = adjust_dynamic_range(
         imgs.permute(0, 2, 3, 1), drange_in=(-1.0, 1.0), drange_out=(0.0, 1.0)
     )
@@ -52,6 +52,6 @@ def str2GANLoss(v):
     else:
         raise argparse.ArgumentTypeError(
             "Unknown gan-loss function requested."
-            f"Please consider contributing a your GANLoss to: "
+            f"Please consider contributing your GANLoss to: "
             f"{str(Path(losses.__file__).absolute())}"
         )

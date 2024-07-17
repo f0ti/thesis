@@ -45,6 +45,26 @@ def get_transform(
     )
 
 
+def get_data_loader(
+    dataset: Dataset, batch_size: int, num_workers: int = 8
+) -> DataLoader:
+    """
+    generate the data_loader from the given dataset
+    Args:
+        dataset: Torch dataset object
+        batch_size: batch size for training
+        num_workers: num of parallel readers for reading the data
+    Returns: dataloader for the dataset
+    """
+    return DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=num_workers,
+        drop_last=True,
+    )
+
+
 class RGBTileDataset(Dataset):
     def __init__(
         self,
@@ -102,23 +122,3 @@ class RGBTileDataset(Dataset):
         )
 
         return {"A": input, "B": label}
-
-
-def get_data_loader(
-    dataset: Dataset, batch_size: int, num_workers: int = 8
-) -> DataLoader:
-    """
-    generate the data_loader from the given dataset
-    Args:
-        dataset: Torch dataset object
-        batch_size: batch size for training
-        num_workers: num of parallel readers for reading the data
-    Returns: dataloader for the dataset
-    """
-    return DataLoader(
-        dataset,
-        batch_size=batch_size,
-        shuffle=True,
-        num_workers=num_workers,
-        drop_last=True,
-    )

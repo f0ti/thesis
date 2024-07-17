@@ -96,6 +96,7 @@ def parse_arguments() -> argparse.Namespace:
     # ************** IMPORTANT HYPERPARAMETER
     parser.add_argument("--checkpoint_factor", action="store", type=int, required=False, default=5,
                         help="number of epochs after which a model snapshot is saved per training stage")
+    parser.add_argument("--wb_mode", action="store", type=bool, required=False, default=False, help="weights and biases mode")
     # fmt: on
 
     parsed_args = parser.parse_args()
@@ -152,6 +153,7 @@ def train_progan(args: argparse.Namespace) -> None:
         feedback_factor=args.feedback_factor,
         checkpoint_factor=args.checkpoint_factor,
         save_dir=args.output_dir,
+        wb_mode=args.wb_mode,
     )
 
 

@@ -87,14 +87,11 @@ class StandardGAN(GANLoss):
         _: Tensor,
         fake_samples: Tensor,
         depth: int,
-        alpha: float,
-        labels: Optional[Tensor] = None,
+        alpha: float
     ) -> Tensor:
-        if labels is not None:
-            assert discriminator.conditional, "labels passed to an unconditional dis"
-            fake_scores = discriminator(fake_samples, depth, alpha, labels)
-        else:
-            fake_scores = discriminator(fake_samples, depth, alpha)
+        
+        fake_scores = discriminator(fake_samples, depth, alpha)
+        print(fake_scores)
         return self.criterion(
             fake_scores, torch.ones(fake_scores.shape).to(fake_scores.device)
         )
@@ -118,8 +115,7 @@ class WganGP(GANLoss):
         fake_samples: Tensor,
         depth: int,
         alpha: float,
-        reg_lambda: float = 10,
-        labels: Optional[Tensor] = None,
+        reg_lambda: float = 10
     ) -> Tensor:
         """
         private helper for calculating the gradient penalty
@@ -142,12 +138,7 @@ class WganGP(GANLoss):
         merged = epsilon * real_samples + ((1 - epsilon) * fake_samples)
         merged.requires_grad_(True)
 
-        # forward pass
-        if labels is not None:
-            assert dis.conditional, "labels passed to an unconditional discriminator"
-            op = dis(merged, depth, alpha, labels)
-        else:
-            op = dis(merged, depth, alpha)
+        op = dis(merged, depth, alpha)
 
         # perform backward pass from op to merged for obtaining the gradients
         gradient = torch.autograd.grad(
@@ -175,13 +166,8 @@ class WganGP(GANLoss):
         alpha: float,
         labels: Optional[Tensor] = None,
     ) -> Tensor:
-        if labels is not None:
-            assert discriminator.conditional, "labels passed to an unconditional dis"
-            real_scores = discriminator(real_samples, depth, alpha, labels)
-            fake_scores = discriminator(fake_samples, depth, alpha, labels)
-        else:
-            real_scores = discriminator(real_samples, depth, alpha)
-            fake_scores = discriminator(fake_samples, depth, alpha)
+        real_scores = discriminator(real_samples, depth, alpha)
+        fake_scores = discriminator(fake_samples, depth, alpha)
         loss = (
             torch.mean(fake_scores)
             - torch.mean(real_scores)
@@ -190,7 +176,7 @@ class WganGP(GANLoss):
 
         # calculate the WGAN-GP (gradient penalty)
         gp = self._gradient_penalty(
-            discriminator, real_samples, fake_samples, depth, alpha, labels=labels
+            discriminator, real_samples, fake_samples, depth, alpha
         )
         loss += gp
 
@@ -203,11 +189,6 @@ class WganGP(GANLoss):
         fake_samples: Tensor,
         depth: int,
         alpha: float,
-        labels: Optional[Tensor] = None,
     ) -> Tensor:
-        if labels is not None:
-            assert discriminator.conditional, "labels passed to an unconditional dis"
-            fake_scores = discriminator(fake_samples, depth, alpha, labels)
-        else:
-            fake_scores = discriminator(fake_samples, depth, alpha)
+        fake_scores = discriminator(fake_samples, depth, alpha)
         return -torch.mean(fake_scores)

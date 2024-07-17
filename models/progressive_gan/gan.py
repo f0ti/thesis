@@ -6,6 +6,7 @@ import copy
 import datetime
 import time
 import timeit
+import wandb
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -126,7 +127,6 @@ class ProGAN:
             real_batch: real samples batch
             depth: current depth of optimization
             alpha: current alpha for fade-in
-            labels: labels for conditional discrimination
 
         Returns: discriminator loss value
         """
@@ -156,7 +156,6 @@ class ProGAN:
         real_batch: Tensor,
         depth: int,
         alpha: float,
-        labels: Optional[Tensor] = None,
     ) -> float:
         """
         performs a single weight update step on generator using the batch of data
@@ -168,7 +167,6 @@ class ProGAN:
             real_batch: real samples batch
             depth: current depth of optimization
             alpha: current alpha for fade-in
-            labels: labels for conditional discrimination
 
         Returns: generator loss value
         """
@@ -177,9 +175,7 @@ class ProGAN:
         # generate fake samples:
         fake_samples = self.gen(noise, depth, alpha)
 
-        gen_loss = loss.gen_loss(
-            self.dis, real_samples, fake_samples, depth, alpha, labels=labels
-        )
+        gen_loss = loss.gen_loss(self.dis, real_samples, fake_samples, depth, alpha)
 
         # optimize the generator
         gen_optim.zero_grad()
@@ -279,6 +275,7 @@ class ProGAN:
         feedback_factor: int = 100,
         save_dir=Path("./saved_models"),
         checkpoint_factor: int = 10,
+        wb_mode: bool = True,
     ):
         """
         # TODO implement support for conditional GAN here
@@ -336,10 +333,20 @@ class ProGAN:
         model_dir.mkdir(parents=True, exist_ok=True)
         log_dir.mkdir(parents=True, exist_ok=True)
 
+        # wandb
+        if wb_mode:
+            wandb.init(project="thesis", config=vars(opt))
+
         feedback_generator = self.gen_shadow if self.use_ema else self.gen
 
         # # image saving mechanism
         # with torch.no_grad():
+        #     test_dataset = RGBTileDataset(
+        #         image_set="train",
+        #         transform=get_transform(
+        #         new_size=(int(2**args.depth), int(2**args.depth)),
+        #         flip_horizontal=args.flip_horizontal,
+        #     )
         #     dummy_data_loader = get_data_loader(dataset, num_samples, num_workers)
         #     real_images_for_render = next(iter(dummy_data_loader))
         #     fixed_input = torch.randn(num_samples, self.latent_size).to(self.device)
@@ -370,10 +377,13 @@ class ProGAN:
             current_batch_size = batch_sizes[depth_list_index]
             data = get_data_loader(dataset, current_batch_size, num_workers)
             ticker = 1
+            
+            # because for each depth we can define a different number of epochs
             for epoch in range(1, epochs[depth_list_index] + 1):
                 start = timeit.default_timer()  # record time at the start of epoch
                 print(f"\nEpoch: {epoch}")
                 total_batches = len(data)
+                print(f"Total batches: {total_batches}")
 
                 # compute the fader point
                 fader_point = int(
@@ -388,6 +398,7 @@ class ProGAN:
 
                     # extract current batch of data for training
                     gan_input = batch['A'].to(self.device)
+                    print("GAN input shape: ", gan_input.shape)
                     images = batch['B'].to(self.device)
 
                     gen_loss, dis_loss = None, None
@@ -429,10 +440,11 @@ class ProGAN:
                         summary.add_scalar(
                             "gen_loss", gen_loss, global_step=global_step
                         )
+
                         # create a grid of samples and save it
-                        resolution_dir = log_dir / str(int(2**current_depth))
-                        resolution_dir.mkdir(exist_ok=True)
-                        gen_img_file = resolution_dir / f"{epoch}_{i}.png"
+                        # resolution_dir = log_dir / str(int(2**current_depth))
+                        # resolution_dir.mkdir(exist_ok=True)
+                        # gen_img_file = resolution_dir / f"{epoch}_{i}.png"
 
                         # this is done to allow for more GPU space
                         # with torch.no_grad():
