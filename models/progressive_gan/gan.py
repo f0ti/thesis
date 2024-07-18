@@ -398,7 +398,6 @@ class ProGAN:
 
                     # extract current batch of data for training
                     gan_input = batch['A'].to(self.device)
-                    print("GAN input shape: ", gan_input.shape)
                     images = batch['B'].to(self.device)
 
                     gen_loss, dis_loss = None, None
