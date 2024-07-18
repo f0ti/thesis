@@ -29,14 +29,14 @@ def adjust_dynamic_range(
 
 def post_process_generated_images(imgs: Tensor) -> np.ndarray:
     imgs = adjust_dynamic_range(
-        imgs.permute(0, 2, 3, 1), drange_in=(-1.0, 1.0), drange_out=(0.0, 1.0)
+        imgs, drange_in=(-1.0, 1.0), drange_out=(0.0, 1.0)
     )
     return (imgs * 255.0).detach().cpu().numpy().astype(np.uint8)
 
 
 def post_process_coordinate_images(imgs: Tensor) -> np.ndarray:
     imgs = adjust_dynamic_range(
-        imgs.permute(0, 2, 3, 1), drange_in=(-1.0, 1.0), drange_out=(0.0, 1.0)
+        imgs, drange_in=(-1.0, 1.0), drange_out=(0.0, 1.0)
     )
     return imgs.detach().cpu().numpy()
 
