@@ -33,7 +33,7 @@ model_g.load_state_dict(torch.load(model_path))
 test_set = RGBTileDataset(dataset=opt.dataset_name, image_set="test")
 test_dl = DataLoader(dataset=test_set, num_workers=opt.threads, batch_size=opt.batch_size, shuffle=False)
 
-for i, batch in enumerate(test_dl):
+for batch in test_dl:
     # Model inputs
     xyz_input = batch["A"].cuda()
     out_imgs = model_g(xyz_input)
