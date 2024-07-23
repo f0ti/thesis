@@ -7,7 +7,8 @@ import torch
 from torch.backends import cudnn
 
 from data import RGBTileDataset, get_transform
-from gan import ProGAN
+from gan import CycleGAN, ProGAN
+from models.progressive_gan.losses import CycleGANLoss
 from networks import Discriminator, Generator, load_models
 from utils import str2bool, str2GANLoss
 
@@ -149,6 +150,62 @@ def train_progan(args: argparse.Namespace) -> None:
         dis_learning_rate=args.d_lrate,
         num_samples=args.num_feedback_samples,
         start_depth=args.start_depth,
+        num_workers=args.num_workers,
+        feedback_factor=args.feedback_factor,
+        checkpoint_factor=args.checkpoint_factor,
+        save_dir=args.output_dir,
+        wb_mode=args.wb_mode,
+    )
+
+
+def train_cyclegan(args: argparse.Namespace) -> None:
+    """
+    method to train the cyclegan given the configuration parameters
+    Args:
+        args: configuration used for the training
+    Returns: None
+    """
+    print(f"Selected arguments: {args}")
+
+    generator_AB = Generator(
+        depth=args.depth
+    )
+
+    generator_BA = Generator(
+        depth=args.depth,
+    )
+
+    discriminator_A = Discriminator(
+        depth=args.depth,
+    )
+
+    discriminator_B = Discriminator(
+        depth=args.depth,
+    )
+
+    cyclegan = CycleGAN(
+        generator_AB,
+        generator_BA,
+        discriminator_A,
+        discriminator_B,
+        device=device,
+        use_ema=args.use_ema,
+        ema_beta=args.ema_beta,
+    )
+
+    cyclegan.train(
+        dataset=RGBTileDataset(
+            image_set="train",
+            transform=get_transform(
+                new_size=(int(2**args.depth), int(2**args.depth)),
+                flip_horizontal=args.flip_horizontal,
+            ),
+        ),
+        epochs=10,
+        batch_sizes=1,
+        loss_fn=CycleGANLoss(),
+        gen_learning_rate=args.g_lrate,
+        dis_learning_rate=args.d_lrate,
         num_workers=args.num_workers,
         feedback_factor=args.feedback_factor,
         checkpoint_factor=args.checkpoint_factor,

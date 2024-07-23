@@ -92,3 +92,4 @@ dataset/
 wandb/
 saved_models/
 models_vault/
+exec_time.py
