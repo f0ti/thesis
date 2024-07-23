@@ -7,9 +7,9 @@ import torch
 from torch.backends import cudnn
 
 from data import RGBTileDataset, get_transform
-from gan import CycleGAN, ProGAN
+from gan import CycleGAN
 from losses import CycleGANLoss
-from networks import Discriminator, Generator, load_models
+from networks import Discriminator, Generator
 from utils import str2bool, str2GANLoss
 
 # turn fast mode on
@@ -30,15 +30,11 @@ def parse_arguments() -> argparse.Namespace:
     )
 
     # fmt: off
+
+    parser.add_argument("model_path", action="store", type=Path, help="path to the trained_model.bin file")
     # Required arguments (input path to the data and the output directory for saving training assets)
     parser.add_argument("--output_dir", action="store", type=Path, default=Path("./saved_models"), required=False,
                         help="Path to the directory for saving the logs and models")
-    
-    # dataset related options:
-    parser.add_argument("--rec_dir", action="store", type=str2bool, default=True, required=False,
-                        help="whether images are stored under one folder or under a recursive dir structure")
-    parser.add_argument("--flip_horizontal", action="store", type=str2bool, default=False, required=False,
-                        help="whether to apply mirror (horizontal) augmentation")
 
     # model architecture related options:
     # ************** IMPORTANT HYPERPARAMETER
@@ -62,20 +58,14 @@ def parse_arguments() -> argparse.Namespace:
                         help="value of the ema beta")
     
     # ************** IMPORTANT HYPERPARAMETER
-    parser.add_argument("--epochs", action="store", type=list, required=False, nargs="+",
-                        default=[5 for _ in range(7)],  # because there are 7 stages
+    parser.add_argument("--epochs", action="store", type=int, required=False, nargs="+",
+                        default=10,  # because there are 7 stages
                         help="number of epochs over the training dataset per stage")
     # ************** IMPORTANT HYPERPARAMETER
-    parser.add_argument("--batch_sizes", action="store", type=list, required=False, nargs="+",
-                        default=[8, 8, 8, 4, 4, 2, 1],  # (4x4), (8x8), (16x16), (32x32), (64x64), (128x128), (256x256)
-                        help="batch size used for training the model per stage")
-    # ************** IMPORTANT HYPERPARAMETER
-    parser.add_argument("--batch_repeats", action="store", type=int, required=False, default=2,
-                        help="number of G and D steps executed per training iteration")
-    parser.add_argument("--fade_in_percentages", action="store", type=int, required=False, nargs="+",
-                        default=[50 for _ in range(7)],
-                        help="number of iterations for which fading of new layer happens. Measured in percentage")
-    parser.add_argument("--loss_fn", action="store", type=str2GANLoss, required=False, default="wgan_gp",
+    parser.add_argument("--batch_sizes", action="store", type=int, required=False, nargs="+",
+                        default=1,
+                        help="batch size used for training the model")
+    parser.add_argument("--loss_fn", action="store", type=str2GANLoss, required=False, default="",
                         help="loss function used for training the GAN. "
                              "Current options: [wgan_gp, standard_gan]")
     parser.add_argument("--g_lrate", action="store", type=float, required=False, default=0.003,
@@ -84,11 +74,6 @@ def parse_arguments() -> argparse.Namespace:
                         help="learning rate used by the discriminator")
     parser.add_argument("--num_feedback_samples", action="store", type=int, required=False, default=4,
                         help="number of samples used for fixed seed gan feedback")
-    parser.add_argument("--start_depth", action="store", type=int, required=False, default=2,
-                        help="resolution to start the training from. "
-                             "Example 2 --> (4x4) | 3 --> (8x8) ... | 10 --> (1024x1024). "
-                             "Note that this is not a way to restart a partial training. "
-                             "Resuming is not supported currently. But will soon be.")
     parser.add_argument("--num_workers", action="store", type=int, required=False, default=8,
                         help="number of dataloader subprocesses. It's a pytorch thing, you can ignore it ;)."
                              " Leave it to the default value unless things are weirdly slow for you.")
@@ -104,55 +89,59 @@ def parse_arguments() -> argparse.Namespace:
     return parsed_args
 
 
-def train_progan(args: argparse.Namespace) -> None:
+
+def finetune_cyclegan(args: argparse.Namespace) -> None:
     """
-    method to train the progan (progressively grown gan) given the configuration parameters
+    method to train the cyclegan given the configuration parameters
     Args:
         args: configuration used for the training
     Returns: None
     """
     print(f"Selected arguments: {args}")
 
-    generator = Generator(
+    generator_AB = Generator(
         depth=args.depth,
-        num_channels=args.num_channels,
-        use_eql=args.use_eql,
-    )
-    discriminator = Discriminator(
-        depth=args.depth,
-        num_channels=args.num_channels,
-        latent_size=args.latent_size,
-        use_eql=args.use_eql,
+
     )
 
-    progan = ProGAN(
-        generator,
-        discriminator,
+    generator_BA = Generator(
+        depth=args.depth,
+    )
+
+    discriminator_A = Discriminator(
+        depth=args.depth,
+    )
+
+    discriminator_B = Discriminator(
+        depth=args.depth,
+    )
+
+    cyclegan = CycleGAN(
+        generator_AB,
+        generator_BA,
+        discriminator_A,
+        discriminator_B,
         device=device,
         use_ema=args.use_ema,
         ema_beta=args.ema_beta,
     )
 
-    progan.train(
+    cyclegan.train(
         dataset=RGBTileDataset(
             image_set="train",
             transform=get_transform(
                 new_size=(int(2**args.depth), int(2**args.depth)),
-                flip_horizontal=args.flip_horizontal,
             ),
         ),
-        epochs=args.epochs,
-        batch_sizes=args.batch_sizes,
-        fade_in_percentages=args.fade_in_percentages,
-        loss_fn=args.loss_fn,
-        batch_repeats=args.batch_repeats,
+        epochs=10,
+        batch_sizes=1,
+        loss_fn=CycleGANLoss(),
         gen_learning_rate=args.g_lrate,
         dis_learning_rate=args.d_lrate,
-        num_samples=args.num_feedback_samples,
-        start_depth=args.start_depth,
         num_workers=args.num_workers,
         feedback_factor=args.feedback_factor,
         checkpoint_factor=args.checkpoint_factor,
+        pretrained_model_path=args.model_path,
         save_dir=args.output_dir,
         wb_mode=args.wb_mode,
     )
@@ -163,7 +152,7 @@ def main() -> None:
     Main function of the script
     Returns: None
     """
-    train_progan(parse_arguments())
+    finetune_cyclegan(parse_arguments())
 
 
 if __name__ == "__main__":

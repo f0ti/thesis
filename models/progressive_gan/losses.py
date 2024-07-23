@@ -215,12 +215,12 @@ class CycleGANLoss:
         # Discriminator A
         loss_real_A = self.criterion_GAN(discriminator_A(real_A), torch.ones(real_A.shape).to(real_A.device))
         fake_A = generator_BA(real_B)
-        loss_fake_A = self.criterion_GAN(discriminator_A(fake_A.detach()), torch.zeros(fake_A.shape).to(fake_A.device))
+        loss_fake_A = self.criterion_GAN(discriminator_A(fake_A), torch.zeros(fake_A.shape).to(fake_A.device))
 
         # Discriminator B
         loss_real_B = self.criterion_GAN(discriminator_B(real_B), torch.ones(real_B.shape).to(real_B.device))
         fake_B = generator_AB(real_A)
-        loss_fake_B = self.criterion_GAN(discriminator_B(fake_B.detach()), torch.zeros(fake_B.shape).to(fake_B.device))
+        loss_fake_B = self.criterion_GAN(discriminator_B(fake_B), torch.zeros(fake_B.shape).to(fake_B.device))
 
         return (loss_real_A + loss_fake_A + loss_real_B + loss_fake_B) / 4
 

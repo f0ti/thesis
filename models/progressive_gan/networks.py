@@ -184,7 +184,7 @@ class Discriminator(th.nn.Module):
         )
 
     def forward(
-        self, x: Tensor, depth: int, alpha: float
+        self, x: Tensor, depth: Optional[int] = None, alpha: float = 1.0
     ) -> Tensor:
         """
         forward pass of the discriminator
@@ -197,6 +197,7 @@ class Discriminator(th.nn.Module):
 
         Returns: raw discriminator scores
         """
+        depth = self.depth if depth is None else depth
         assert (depth <= self.depth), f"Requested output depth {depth} cannot be evaluated"
 
         if depth > 2:

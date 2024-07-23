@@ -9,7 +9,7 @@ import torch
 from torch import Tensor
 
 import losses
-from losses import WganGP, StandardGAN
+from losses import CycleGANLoss, WganGP, StandardGAN
 
 
 def adjust_dynamic_range(
@@ -56,6 +56,8 @@ def str2bool(v):
 def str2GANLoss(v):
     if v.lower() == "wgan_gp":
         return WganGP()
+    elif v.lower() == "cycle_gan":
+        return CycleGANLoss()
     elif v.lower() == "standard_gan":
         return StandardGAN()
     else:

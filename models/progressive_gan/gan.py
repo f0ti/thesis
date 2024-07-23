@@ -339,10 +339,6 @@ class ProGAN:
         model_dir.mkdir(parents=True, exist_ok=True)
         log_dir.mkdir(parents=True, exist_ok=True)
 
-        # wandb
-        if wb_mode:
-            wandb.init(project="thesis", config=vars(opt))
-
         # tensorboard summarywriter:
         summary = SummaryWriter(str(log_dir / "tensorboard"))
 
@@ -451,9 +447,9 @@ class CycleGAN:
         use_ema: bool = False,
         ema_beta: float = 0.999,
     ):
-        assert gen_AB.depth == gen_BA.depth == dis_A == dis_B, (
+        assert gen_AB.depth == gen_BA.depth == dis_A.depth == dis_B.depth, (
             f"Generator and Discriminator depths are not compatible. "
-            f"GEN_Depth: {gen_AB.depth}  DIS_Depth: {dis_A.depth}"
+            f"GEN_AB_Depth: {gen_AB.depth}  GEN_BA_Depth: {gen_BA.depth}  DIS_A_Depth: {dis_A.depth}  DIS_B_Depth: {dis_B.depth}"
         )
         self.gen_AB = gen_AB.to(device)
         self.gen_BA = gen_BA.to(device)
@@ -487,6 +483,7 @@ class CycleGAN:
 
         generator = Generator(**generator_data["conf"])
         generator.load_state_dict(generator_data["state_dict"])
+        generator.to(self.device)
 
         return generator
 
@@ -497,6 +494,7 @@ class CycleGAN:
 
         discriminator = Discriminator(**discriminator_data["conf"])
         discriminator.load_state_dict(discriminator_data["state_dict"])
+        discriminator.to(self.device)
 
         return discriminator
 
@@ -571,7 +569,7 @@ class CycleGAN:
 
 
     def _toggle_all_networks(self, mode="train"):
-        for network in (self.gen, self.dis):
+        for network in (self.gen_AB, self.gen_BA, self.dis_A, self.dis_B):
             if mode.lower() == "train":
                 network.train()
             elif mode.lower() == "eval":
@@ -628,6 +626,7 @@ class CycleGAN:
         feedback_factor: int = 100,
         save_dir=Path("./saved_models/cyclegan"),
         checkpoint_factor: int = 10,
+        pretrained_model_path: Optional[Path] = None,
         wb_mode: bool = True,
     ):
         print(f"Loaded the dataset with: {len(dataset)} images ...")  # type: ignore
@@ -663,15 +662,16 @@ class CycleGAN:
             eps=1e-8,
         )
 
+        assert pretrained_model_path is not None, "pretrained model path is required"
+
+        self.gen_AB = self.load_weights_generator(pretrained_model_path)
+        self.dis_B = self.load_weights_discriminator(pretrained_model_path)
+
         # verbose stuff
         print("setting up the image saving mechanism")
         model_dir, log_dir = save_dir / "models", save_dir / "logs"
         model_dir.mkdir(parents=True, exist_ok=True)
         log_dir.mkdir(parents=True, exist_ok=True)
-
-        # wandb
-        if wb_mode:
-            wandb.init(project="thesis", config=vars(opt))
 
         # tensorboard summarywriter:
         summary = SummaryWriter(str(log_dir / "tensorboard"))
@@ -696,11 +696,11 @@ class CycleGAN:
                 gen_loss, dis_loss = None, None
 
                 dis_loss = self.optimize_discriminator(
-                    loss_fn, gen_optim_AB, gen_optim_BA, dis_optim_A, dis_optim_B, real_A, real_B
+                    loss_fn, dis_optim_A, dis_optim_B, real_A, real_B
                 )
 
                 gen_loss = self.optimize_generator(
-                    loss_fn, gen_optim_AB, gen_optim_BA, dis_optim_A, dis_optim_B, real_A, real_B
+                    loss_fn, gen_optim_AB, gen_optim_BA, real_A, real_B
                 )
 
                 global_step += 1
@@ -724,9 +724,6 @@ class CycleGAN:
                         "gen_loss", gen_loss, global_step=global_step
                     )
 
-                # increment the alpha ticker and the step
-                ticker += 1
-
             stop = timeit.default_timer()
             print("Time taken for epoch: %.3f secs" % (stop - start))
 
@@ -737,5 +734,5 @@ class CycleGAN:
                 save_file = model_dir / f"epoch_{epoch}.bin"
                 torch.save(self.get_save_info(), save_file)
 
-    self._toggle_all_networks("eval")
-    print("Training completed ...")
+        self._toggle_all_networks("eval")
+        print("Training completed ...")
