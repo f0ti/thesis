@@ -228,14 +228,14 @@ class Discriminator(th.nn.Module):
         }
 
 
-def create_generator_from_saved_model(saved_model_path: Path) -> Generator:
+def create_generator_from_saved_model(saved_model_path: Path, cycleganed=False) -> Generator:
     # load the data from the saved_model
     loaded_data = torch.load(saved_model_path)
 
     # create a generator from the loaded data:
     generator_data = (
-        loaded_data["shadow_generator"]
-        if "shadow_generator" in loaded_data
+        loaded_data["generatorAB"]
+        if cycleganed
         else loaded_data["generator"]
     )
     generator = Generator(**generator_data["conf"])

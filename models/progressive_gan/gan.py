@@ -460,13 +460,6 @@ class CycleGAN:
         self.depth = gen_AB.depth  # any works
         self.device = device
 
-        # if code is to be run on GPU, we can use DataParallel:
-        # if device == torch.device("cuda"):
-        #     self.gen_AB = DataParallel(self.gen_AB)
-        #     self.gen_BA = DataParallel(self.gen_BA)
-        #     self.dis_A = DataParallel(self.dis_A)
-        #     self.dis_B = DataParallel(self.dis_B)
-
         print(f"Generator AB Network: {self.gen_AB}")
         print(f"Generator BA Network: {self.gen_BA}")
         print(f"Discriminator A Network: {self.dis_A}")
@@ -592,18 +585,12 @@ class CycleGAN:
         return grad_ok
 
     def get_save_info(self) -> Dict[str, Any]:
-
-        if self.device == torch.device("cpu"):
-            generatorAB_save_info = self.gen_AB.get_save_info()
-            generatorBA_save_info = self.gen_BA.get_save_info()
-            discriminatorA_save_info = self.dis_A.get_save_info()
-            discriminatorB_save_info = self.dis_B.get_save_info()
-        else:
-            generatorAB_save_info = self.gen_AB.module.get_save_info()
-            generatorBA_save_info = self.gen_BA.module.get_save_info()
-            discriminatorA_save_info = self.dis_A.module.get_save_info()
-            discriminatorB_save_info = self.dis_B.module.get_save_info()
         
+        generatorAB_save_info = self.gen_AB.get_save_info()
+        generatorBA_save_info = self.gen_BA.get_save_info()
+        discriminatorA_save_info = self.dis_A.get_save_info()
+        discriminatorB_save_info = self.dis_B.get_save_info()
+
         save_info = {
             "generatorAB": generatorAB_save_info,
             "generatorBA": generatorBA_save_info,
@@ -664,6 +651,7 @@ class CycleGAN:
 
         assert pretrained_model_path is not None, "pretrained model path is required"
 
+        print("Loading the pretrained model ...")
         self.gen_AB = self.load_weights_generator(pretrained_model_path)
         self.dis_B = self.load_weights_discriminator(pretrained_model_path)
 
@@ -681,13 +669,12 @@ class CycleGAN:
         global_step = 0
 
         print("Starting the training process ... ")
-        # because for each depth we can define a different number of epochs
         data = get_data_loader(dataset, batch_sizes, num_workers)
         for epoch in range(1, epochs+1):
             start = timeit.default_timer()  # record time at the start of epoch
             print(f"\nEpoch: {epoch}")
             total_batches = len(data)
-            for i, batch in enumerate(data):
+            for i, batch in enumerate(data, start=1):
 
                 # extract current batch of data for training
                 real_A = batch['A'].to(self.device)
@@ -695,9 +682,17 @@ class CycleGAN:
 
                 gen_loss, dis_loss = None, None
 
-                dis_loss = self.optimize_discriminator(
-                    loss_fn, dis_optim_A, dis_optim_B, real_A, real_B
-                )
+                # as proposed in the original paper of CycleGAN, we need to implement
+                # a buffer of n samples to store the generated samples, as presented
+                # in the paper https://arxiv.org/pdf/1612.07828.pdf. To optimize the
+                # discriminator, b/2 samples are drawn from the buffer and b/2 samples
+                # are drawn from the current minibatch. Since I am using a batch size
+                # of 1, this does not make sense, so will skip this part for now.
+                
+                if i % 10 == 0:
+                    dis_loss = self.optimize_discriminator(
+                        loss_fn, dis_optim_A, dis_optim_B, real_A, real_B
+                    )
 
                 gen_loss = self.optimize_generator(
                     loss_fn, gen_optim_AB, gen_optim_BA, real_A, real_B

@@ -47,7 +47,7 @@ def inference(args: argparse.Namespace) -> None:
 
     # load the data from the trained-model
     print(f"loading data from the trained model at: {args.model_path}")
-    generator = create_generator_from_saved_model(args.model_path).to(device)
+    generator = create_generator_from_saved_model(args.model_path, cycleganed=True).to(device)
 
     test_set = RGBTileDataset(dataset=args.dataset_name, image_set="test")
     test_dl = get_data_loader(test_set, batch_size=args.batch_size)

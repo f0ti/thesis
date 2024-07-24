@@ -37,13 +37,10 @@ def parse_arguments() -> argparse.Namespace:
                         help="Path to the directory for saving the logs and models")
 
     # model architecture related options:
-    # ************** IMPORTANT HYPERPARAMETER
     parser.add_argument("--depth", action="store", type=int, default=8, required=False,
-                        help="depth of the generator and the discriminator. Starts from 2. "
-                             "Example 2 --> (4x4) | 3 --> (8x8) ... | 10 --> (1024x1024)")
+                        help="depth of the generator and the discriminator. Starts from 2. ")
     parser.add_argument("--num_channels", action="store", type=int, default=3, required=False,
                         help="number of channels in the image data")
-    # ************** IMPORTANT HYPERPARAMETER
     parser.add_argument("--latent_size", action="store", type=int, default=256, required=False,
                         help="latent size of the generator and the discriminator")
 
@@ -56,12 +53,9 @@ def parse_arguments() -> argparse.Namespace:
                              "the averaged one.")
     parser.add_argument("--ema_beta", action="store", type=float, default=0.999, required=False,
                         help="value of the ema beta")
-    
-    # ************** IMPORTANT HYPERPARAMETER
     parser.add_argument("--epochs", action="store", type=int, required=False, nargs="+",
-                        default=10,  # because there are 7 stages
-                        help="number of epochs over the training dataset per stage")
-    # ************** IMPORTANT HYPERPARAMETER
+                        default=20,
+                        help="number of epochs for the training")
     parser.add_argument("--batch_sizes", action="store", type=int, required=False, nargs="+",
                         default=1,
                         help="batch size used for training the model")
@@ -79,7 +73,6 @@ def parse_arguments() -> argparse.Namespace:
                              " Leave it to the default value unless things are weirdly slow for you.")
     parser.add_argument("--feedback_factor", action="store", type=int, required=False, default=10,
                         help="number of feedback logs written per epoch")
-    # ************** IMPORTANT HYPERPARAMETER
     parser.add_argument("--checkpoint_factor", action="store", type=int, required=False, default=5,
                         help="number of epochs after which a model snapshot is saved per training stage")
     parser.add_argument("--wb_mode", action="store", type=bool, required=False, default=False, help="weights and biases mode")
@@ -133,8 +126,8 @@ def finetune_cyclegan(args: argparse.Namespace) -> None:
                 new_size=(int(2**args.depth), int(2**args.depth)),
             ),
         ),
-        epochs=10,
-        batch_sizes=1,
+        epochs=args.epochs,
+        batch_sizes=args.batch_sizes,
         loss_fn=CycleGANLoss(),
         gen_learning_rate=args.g_lrate,
         dis_learning_rate=args.d_lrate,
