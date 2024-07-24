@@ -84,19 +84,21 @@ class Tile:
 
     @staticmethod
     def _scale_xyz(xyz: np.ndarray) -> np.ndarray:
+        xyz = np.clip(xyz, 0, None, dtype=np.float32)  #  set min=0
         
-        # set min to 0
-        xyz = np.clip(xyz, 0, None, dtype=np.float32)
-
         # theoretically, we expect X and Y data values to be between 0-500 and Z between 0-50
         xyz[:, :, 0] = xyz[:, :, 0] / 500
         xyz[:, :, 1] = xyz[:, :, 1] / 500
         xyz[:, :, 2] = xyz[:, :, 2] / 50
 
-        # clip values to 0-1
-        xyz = np.clip(xyz, 0, 1, dtype=np.float32)
+        return np.clip(xyz, 0, 1, dtype=np.float32)  # clip values to 0-1
 
-        return xyz
+    @staticmethod
+    def _scale_z(z: np.ndarray) -> np.ndarray:
+        z = np.clip(z, 0, None, dtype=np.float32)
+        z[:, :, 2] = z[:, :, 2] / 50
+
+        return np.clip(z, 0, 1, dtype=np.float32)
 
     @staticmethod
     def _scale_rgb(img: np.ndarray) -> np.ndarray:
@@ -111,14 +113,20 @@ class Tile:
         img_name = self.filename.split("/")[-1]
         np.save(f"{root}/{img_name}.npy", img)
 
-    def save_dtm(self, root) -> None:
-        Z = np.asarray(self.Z, dtype=np.float64).reshape(self.width, self.height, 1)
-        Z = np.clip(Z, 0, 50, dtype=np.float16)
-        dtm_name = self.filename.split("/")[-1]
-        np.save(f"{root}/{dtm_name}.npy", Z)
-
     def save_xyz(self, root) -> None:
         xyz = np.asarray(self.xyz, dtype=np.float32).reshape(self.width, self.height, 3)
         xyz = self._scale_xyz(xyz)
         xyz_name = self.filename.split("/")[-1]
         np.save(f"{root}/{xyz_name}.npy", xyz)
+
+    def save_z(self, root) -> None:
+        z = np.asarray(self.Z, dtype=np.float32).reshape(self.width, self.height, 1)
+        z = self._scale_z(z)
+        z_name = self.filename.split("/")[-1]
+        np.save(f"{root}/{z_name}.npy", z)
+
+    def save_dtm(self, root) -> None:
+        Z = np.asarray(self.Z, dtype=np.float64).reshape(self.width, self.height, 1)
+        Z = np.clip(Z, 0, 50, dtype=np.float16)
+        dtm_name = self.filename.split("/")[-1]
+        np.save(f"{root}/{dtm_name}.npy", Z)
