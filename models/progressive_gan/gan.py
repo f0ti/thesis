@@ -4,7 +4,6 @@
 
 import copy
 import datetime
-import dis
 import time
 import timeit
 import wandb
@@ -620,7 +619,8 @@ class CycleGAN:
 
         self._toggle_all_networks("train")
 
-        # create the generator and discriminator optimizers
+        # create the generator and discriminator optimizersconda install python=3.9
+
         gen_optim_AB = torch.optim.Adam(
             params=self.gen_AB.parameters(),
             lr=gen_learning_rate,
@@ -680,7 +680,7 @@ class CycleGAN:
                 real_A = batch['A'].to(self.device)
                 real_B = batch['B'].to(self.device)
 
-                gen_loss, dis_loss = None, None
+                gen_loss, dis_loss = 0, 0  # because None breaks the print
 
                 # as proposed in the original paper of CycleGAN, we need to implement
                 # a buffer of n samples to store the generated samples, as presented

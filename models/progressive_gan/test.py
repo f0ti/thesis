@@ -6,7 +6,7 @@ from torch.backends import cudnn
 
 from networks import create_generator_from_saved_model
 from utils import post_process_generated_images, post_process_coordinate_images, show_diff, show_rgb, show_xyz
-from data import RGBTileDataset, get_data_loader
+from data import MelbourneXYZRGB, get_data_loader
 
 # turn fast mode on
 cudnn.benchmark = True
@@ -24,9 +24,10 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("model_path", action="store", type=Path,
                         help="path to the trained_model.bin file")
     parser.add_argument("dataset_name", action="store", type=str, default="melbourne-top",
-                        help="dataset name, one of ['melbourne-top', 'melbourne-side', 'melbourne-all']")
+                        help="dataset name, one of ['melbourne-top', 'melbourne-side', 'melbourne-z-top']")
     parser.add_argument("--batch_size", action="store", type=int, default=4, required=False,
                         help="batch size used for generating random images")
+    parser.add_argument("--cycleganed", action="store", type=bool, default=False, required=False,)
     # fmt: on
 
     args = parser.parse_args()
@@ -47,9 +48,9 @@ def inference(args: argparse.Namespace) -> None:
 
     # load the data from the trained-model
     print(f"loading data from the trained model at: {args.model_path}")
-    generator = create_generator_from_saved_model(args.model_path, cycleganed=True).to(device)
+    generator = create_generator_from_saved_model(args.model_path, cycleganed=args.cycleganed).to(device)
 
-    test_set = RGBTileDataset(dataset=args.dataset_name, image_set="test")
+    test_set = MelbourneXYZRGB(dataset=args.dataset_name, image_set="test")
     test_dl = get_data_loader(test_set, batch_size=args.batch_size)
 
     print("generating random images from the trained generator ...")

@@ -8,7 +8,6 @@ import numpy as np
 import torch
 from torch import Tensor
 
-import losses
 from losses import CycleGANLoss, WganGP, StandardGAN
 
 
@@ -64,7 +63,7 @@ def str2GANLoss(v):
         raise argparse.ArgumentTypeError(
             "Unknown gan-loss function requested."
             f"Please consider contributing your GANLoss to: "
-            f"{str(Path(losses.__file__).absolute())}"
+            f"{str(Path(losses.__file__).absolute())}"  # type: ignore
         )
 
 

@@ -5,7 +5,7 @@ from typing import Optional
 import torch
 import torch.nn as nn
 from torch import Tensor
-from torch.nn import BCEWithLogitsLoss
+from torch.nn import BCEWithLogitsLoss, DataParallel
 from torchmetrics.image import TotalVariation, StructuralSimilarityIndexMeasure, SpectralDistortionIndex
 
 from networks import Discriminator, Generator
@@ -14,7 +14,7 @@ from networks import Discriminator, Generator
 class GANLoss:
     def dis_loss(
         self,
-        discriminator: Discriminator,
+        discriminator: Discriminator | DataParallel,
         real_samples: Tensor,
         fake_samples: Tensor,
         depth: int,
@@ -37,7 +37,7 @@ class GANLoss:
 
     def gen_loss(
         self,
-        discriminator: Discriminator,
+        discriminator: Discriminator | DataParallel,
         real_samples: Tensor,
         fake_samples: Tensor,
         depth: int,

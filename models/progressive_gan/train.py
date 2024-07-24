@@ -6,9 +6,8 @@ from pathlib import Path
 import torch
 from torch.backends import cudnn
 
-from data import RGBTileDataset, get_transform
-from gan import CycleGAN, ProGAN
-from losses import CycleGANLoss
+from data import MelbourneXYZRGB, MelbourneZRGB, get_transform
+from gan import ProGAN
 from networks import Discriminator, Generator, load_models
 from utils import str2bool, str2GANLoss
 
@@ -45,8 +44,10 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--depth", action="store", type=int, default=8, required=False,
                         help="depth of the generator and the discriminator. Starts from 2. "
                              "Example 2 --> (4x4) | 3 --> (8x8) ... | 10 --> (1024x1024)")
+    parser.add_argument("--input_num_channels", action="store", type=int, default=1, required=False,
+                        help="number of channels in the input image data")
     parser.add_argument("--num_channels", action="store", type=int, default=3, required=False,
-                        help="number of channels in the image data")
+                        help="number of channels in the output image data")
     # ************** IMPORTANT HYPERPARAMETER
     parser.add_argument("--latent_size", action="store", type=int, default=256, required=False,
                         help="latent size of the generator and the discriminator")
@@ -63,7 +64,7 @@ def parse_arguments() -> argparse.Namespace:
     
     # ************** IMPORTANT HYPERPARAMETER
     parser.add_argument("--epochs", action="store", type=list, required=False, nargs="+",
-                        default=[5 for _ in range(7)],  # because there are 7 stages
+                        default=[3, 3, 5, 5, 10, 15, 20],  # because there are 7 stages
                         help="number of epochs over the training dataset per stage")
     # ************** IMPORTANT HYPERPARAMETER
     parser.add_argument("--batch_sizes", action="store", type=list, required=False, nargs="+",
@@ -115,6 +116,7 @@ def train_progan(args: argparse.Namespace) -> None:
 
     generator = Generator(
         depth=args.depth,
+        input_channels=args.input_num_channels,
         num_channels=args.num_channels,
         use_eql=args.use_eql,
     )
@@ -134,10 +136,9 @@ def train_progan(args: argparse.Namespace) -> None:
     )
 
     progan.train(
-        dataset=RGBTileDataset(
+        dataset=MelbourneZRGB(
             image_set="train",
             transform=get_transform(
-                new_size=(int(2**args.depth), int(2**args.depth)),
                 flip_horizontal=args.flip_horizontal,
             ),
         ),

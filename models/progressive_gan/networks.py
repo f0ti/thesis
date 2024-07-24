@@ -64,6 +64,7 @@ class Generator(th.nn.Module):
     def __init__(
         self,
         depth: int = 8,
+        input_channels: int = 1,
         num_channels: int = 3,
         use_eql: bool = True,
     ) -> None:
@@ -71,6 +72,7 @@ class Generator(th.nn.Module):
 
         # object state:
         self.depth = depth
+        self.input_channels = input_channels
         self.num_channels = num_channels
         self.use_eql = use_eql
 
@@ -78,7 +80,7 @@ class Generator(th.nn.Module):
 
         # the initial block for the generator
         self.layers = ModuleList(
-            [GenInitialBlock(self.num_channels, nf(1), use_eql=self.use_eql)]
+            [GenInitialBlock(self.input_channels, nf(1), use_eql=self.use_eql)]
         )
 
         # subsequent blocks for the generator
@@ -115,7 +117,7 @@ class Generator(th.nn.Module):
         else:
             y = x
             # forward pass the input over the layers until depth-2
-            for layer_block in self.layers[: depth - 2]:
+            for layer_block in self.layers[: depth - 2]:  # type: ignore
                 y = layer_block(y)
             # need to interpolate the output to the required resolution,
             # because the output is from a lower resolution from the previous layer
@@ -168,7 +170,7 @@ class Discriminator(th.nn.Module):
 
         for stage in range(1, depth - 1):
             self.layers.insert(
-                0, DisGeneralConvBlock(nf(stage + 1), nf(stage), use_eql)
+                0, DisGeneralConvBlock(nf(stage + 1), nf(stage), use_eql)  # type: ignore
             )
         self.layers = ModuleList(self.layers)
         self.from_rgb = ModuleList(
@@ -208,7 +210,7 @@ class Discriminator(th.nn.Module):
             straight = self.layers[-(depth - 1)](self.from_rgb[-(depth - 1)](x))
             y = (alpha * straight) + ((1 - alpha) * residual)
             
-            for layer_block in self.layers[-(depth - 2) : -1]:
+            for layer_block in self.layers[-(depth - 2) : -1]:  # type: ignore
                 y = layer_block(y)
         else:
             y = self.from_rgb[-1](x)

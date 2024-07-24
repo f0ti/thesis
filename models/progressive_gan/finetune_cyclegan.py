@@ -6,7 +6,7 @@ from pathlib import Path
 import torch
 from torch.backends import cudnn
 
-from data import RGBTileDataset, get_transform
+from data import MelbourneXYZRGB, get_transform
 from gan import CycleGAN
 from losses import CycleGANLoss
 from networks import Discriminator, Generator
@@ -59,9 +59,9 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--batch_sizes", action="store", type=int, required=False, nargs="+",
                         default=1,
                         help="batch size used for training the model")
-    parser.add_argument("--loss_fn", action="store", type=str2GANLoss, required=False, default="",
+    parser.add_argument("--loss_fn", action="store", type=str2GANLoss, required=False, default="cycle_gan",
                         help="loss function used for training the GAN. "
-                             "Current options: [wgan_gp, standard_gan]")
+                             "Current options: [wgan_gp, standard_gan, cycle_gan]")
     parser.add_argument("--g_lrate", action="store", type=float, required=False, default=0.003,
                         help="learning rate used by the generator")
     parser.add_argument("--d_lrate", action="store", type=float, required=False, default=0.003,
@@ -120,7 +120,7 @@ def finetune_cyclegan(args: argparse.Namespace) -> None:
     )
 
     cyclegan.train(
-        dataset=RGBTileDataset(
+        dataset=MelbourneXYZRGB(
             image_set="train",
             transform=get_transform(
                 new_size=(int(2**args.depth), int(2**args.depth)),
