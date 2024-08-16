@@ -36,7 +36,7 @@ class ResidualBlock(nn.Module):
 
     def forward(self, x):
         return x + self.block(x)
-
+    
 
 class GeneratorResNet(nn.Module):
     def __init__(self, input_shape, num_residual_blocks):
@@ -98,6 +98,7 @@ class Discriminator(nn.Module):
         super(Discriminator, self).__init__()
 
         channels, height, width = input_shape
+        print("Discriminator channels, height, width", channels, height, width)
 
         # Calculate output shape of image discriminator (PatchGAN)
         self.output_shape = (1, height // 2 ** 4, width // 2 ** 4)
@@ -122,5 +123,4 @@ class Discriminator(nn.Module):
 
     def forward(self, x):
         x = self.model(x)
-        print(x)
         return x

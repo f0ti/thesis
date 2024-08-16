@@ -91,4 +91,5 @@ ENV/
 dataset/
 wandb/
 saved_models/
+generated_images/
 models_vault/

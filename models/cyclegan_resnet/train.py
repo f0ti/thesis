@@ -1,4 +1,5 @@
 import argparse
+from ctypes.wintypes import tagRECT
 import os
 import numpy as np
 import itertools
@@ -18,8 +19,8 @@ from data import *
 from config import *
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--epochs", type=int, default=7, help="number of epochs of training")
-parser.add_argument("--dataset_name", type=str, default="melbourne-top", help="name of the dataset")
+parser.add_argument("--epochs", type=int, default=11, help="number of epochs of training")
+parser.add_argument("--dataset_name", type=str, default="melbourne-z-top", help="name of the dataset")
 parser.add_argument("--batch_size", type=int, default=1, help="size of the batches")
 parser.add_argument("--lr", type=float, default=0.0002, help="adam: learning rate")
 parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")
@@ -55,12 +56,13 @@ criterion_sdi = SDILoss()
 
 cuda = torch.cuda.is_available()
 
-input_shape = (IMAGE_CHANNEL, IMAGE_WIDTH, IMAGE_HEIGHT)
+input_shape = (1, IMAGE_WIDTH, IMAGE_HEIGHT)
+target_shape = (IMAGE_CHANNEL, IMAGE_WIDTH, IMAGE_HEIGHT)
 
 # Initialize generator and discriminator
 G_AB = GeneratorResNet(input_shape, opt.n_residual_blocks)
-G_BA = GeneratorResNet(input_shape, opt.n_residual_blocks)
-D_A = Discriminator(input_shape)
+G_BA = GeneratorResNet(target_shape, opt.n_residual_blocks)
+D_A = Discriminator(target_shape)
 D_B = Discriminator(input_shape)
 
 if cuda:
@@ -103,13 +105,13 @@ fake_A_buffer = ReplayBuffer()
 fake_B_buffer = ReplayBuffer()
 
 print('Loading datasets...')
-train_set = RGBTileDataset(dataset=opt.dataset_name, image_set="train")
-test_set = RGBTileDataset(dataset=opt.dataset_name, image_set="test")
+train_set = MelbourneZRGB(dataset=opt.dataset_name, image_set="train")
 train_dl = DataLoader(dataset=train_set, num_workers=opt.threads, batch_size=opt.batch_size, shuffle=True)
-test_dl = DataLoader(dataset=test_set, num_workers=opt.threads, batch_size=opt.batch_size, shuffle=False)
 
 def sample_images(batches_done):
     """Saves a generated sample from the test set"""
+    test_set = RGBTileDataset(dataset=opt.dataset_name, image_set="test")
+    test_dl = DataLoader(dataset=test_set, num_workers=opt.threads, batch_size=opt.batch_size, shuffle=False)
     imgs = next(iter(test_dl))
     G_AB.eval()
     G_BA.eval()

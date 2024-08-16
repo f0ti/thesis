@@ -16,7 +16,7 @@ load_dotenv()
 parser = argparse.ArgumentParser(description="pix2pix-pytorch-implementation")
 parser.add_argument("--dataset_name", default="melbourne-top")
 parser.add_argument("--threads", type=int, default=8, help="number of cpu threads to use during batch generation")
-parser.add_argument("--batch_size", type=int, default=1, help="size of the batches")
+parser.add_argument("--batch_size", type=int, default=2, help="size of the batches")
 parser.add_argument("--nepochs", type=int, default=10, help="saved model epochs")
 parser.add_argument("--n_residual_blocks", type=int, default=9, help="number of residual blocks in generator")
 parser.add_argument("--img_height", type=int, default=256, help="size of image height")
@@ -44,12 +44,11 @@ image_writing_path = "generated_images"
 if not os.path.exists(image_writing_path):
     os.makedirs(image_writing_path)
 
-for i, batch in enumerate(test_dl, start=1):
-    pass
+for i, batch in enumerate(test_dl):
     # # Model inputs
-    # xyz_input = batch["A"].cuda()
-    # out_imgs = model_g(xyz_input)
-    # label = out_imgs.cpu().data
+    xyz_input = batch["A"].cuda()
+    out_imgs = model_g(xyz_input)
+    label = out_imgs.cpu().data
 
     # for img_num in range(opt.batch_size):
     #     print(f"Saving image number {i}_{img_num} out of {len(test_dl)}")
@@ -63,24 +62,24 @@ for i, batch in enumerate(test_dl, start=1):
     # show_xyz(batch["A"].numpy(), cols=2)
     
     # ground truth RGB
-    # show_rgb(batch["B"].numpy(), cols=2)
+    show_rgb(batch["B"].numpy(), cols=2)
 
     # predicted RGB
-    # show_rgb(label.numpy(), cols=2)
+    show_rgb(label.numpy(), cols=2)
 
     # difference
     # show_diff(batch["B"].numpy(), label.numpy(), cols=2)
 
-data_base_dir = os.environ.get("DATASET_ROOT") or "."
-dataset_path = os.path.join(data_base_dir, "melbourne-top")
-rgb_path = os.path.join(dataset_path, "test", "rgb_data")
+# data_base_dir = os.environ.get("DATASET_ROOT") or "."
+# dataset_path = os.path.join(data_base_dir, "melbourne-top")
+# rgb_path = os.path.join(dataset_path, "test", "rgb_data")
 
-print("computing fid ...")
-score = fid.compute_fid(
-    fdir1=rgb_path,
-    fdir2=image_writing_path,
-    mode="clean",
-    num_workers=4,
-)
+# print("computing fid ...")
+# score = fid.compute_fid(
+#     fdir1=rgb_path,
+#     fdir2=image_writing_path,
+#     mode="clean",
+#     num_workers=4,
+# )
 
-print(score)
+# print(score)
