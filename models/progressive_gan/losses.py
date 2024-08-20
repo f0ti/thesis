@@ -5,7 +5,7 @@ from typing import Optional
 import torch
 import torch.nn as nn
 from torch import Tensor
-from torch.nn import BCEWithLogitsLoss, DataParallel
+from torch.nn import BCEWithLogitsLoss, MSELoss, DataParallel
 from torchmetrics.image import TotalVariation, StructuralSimilarityIndexMeasure, SpectralDistortionIndex
 
 from networks import Discriminator, Generator

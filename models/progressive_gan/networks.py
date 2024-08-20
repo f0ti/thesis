@@ -64,7 +64,7 @@ class Generator(th.nn.Module):
     def __init__(
         self,
         depth: int = 8,
-        input_channels: int = 1,
+        input_channels: int = 3,
         num_channels: int = 3,
         use_eql: bool = True,
     ) -> None:

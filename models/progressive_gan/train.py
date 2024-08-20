@@ -76,7 +76,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--fade_in_percentages", action="store", type=int, required=False, nargs="+",
                         default=[50 for _ in range(7)],
                         help="number of iterations for which fading of new layer happens. Measured in percentage")
-    parser.add_argument("--loss_fn", action="store", type=str2GANLoss, required=False, default="wgan_gp",
+    parser.add_argument("--loss_fn", action="store", type=str2GANLoss, required=False, default="standard_gan",
                         help="loss function used for training the GAN. "
                              "Current options: [wgan_gp, standard_gan]")
     parser.add_argument("--g_lrate", action="store", type=float, required=False, default=0.003,
@@ -126,6 +126,9 @@ def train_progan(args: argparse.Namespace) -> None:
         latent_size=args.latent_size,
         use_eql=args.use_eql,
     )
+
+    print(discriminator)
+    print(generator)
 
     progan = ProGAN(
         generator,
