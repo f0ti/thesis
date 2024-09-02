@@ -19,7 +19,7 @@ from model import *
 parser = argparse.ArgumentParser()
 parser.add_argument("--epoch", type=int, default=0, help="epoch to start training from")
 parser.add_argument("--n_epochs", type=int, default=11, help="number of epochs of training")
-parser.add_argument("--dataset_name", type=str, default="melbourne", help="name of the dataset")
+parser.add_argument("--dataset_name", type=str, default="melbourne-top", help="name of the dataset")
 parser.add_argument("--batch_size", type=int, default=4, help="size of the batches")
 parser.add_argument("--lr", type=float, default=0.0002, help="adam: learning rate")
 parser.add_argument("--b1", type=float, default=0.9, help="adam: decay of first order momentum of gradient")
@@ -65,7 +65,7 @@ if cuda:
     criterion_GAN.cuda()
     criterion_pixelwise.cuda()
     # criterion_vifp.cuda()
-    criterion_fid.cuda()
+    # criterion_fid.cuda()
 
 if opt.epoch != 0:
     # Load pretrained models

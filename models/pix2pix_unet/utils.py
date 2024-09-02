@@ -1,6 +1,24 @@
+from typing import Tuple
+from torch import Tensor
+
+import torch
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
+
+def adjust_dynamic_range(
+    data: Tensor,
+    drange_in: Tuple[float, float] = (0.0, 1.0),
+    drange_out: Tuple[float, float] = (-1.0, 1.0),
+):
+    if drange_in != drange_out:
+        scale = (np.float32(drange_out[1]) - np.float32(drange_out[0])) / (
+            np.float32(drange_in[1]) - np.float32(drange_in[0])
+        )
+        bias = np.float32(drange_out[0]) - np.float32(drange_in[0]) * scale
+        data = data * scale + bias
+
+    return torch.clamp(data, min=drange_out[0], max=drange_out[1])
 
 # ----------------
 # Debug functions

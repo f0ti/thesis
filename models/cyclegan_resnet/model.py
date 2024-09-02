@@ -1,23 +1,5 @@
 import torch.nn as nn
-import torch.nn.functional as F
-import torch
 from typing import List
-
-
-def weights_init_normal(m):
-    classname = m.__class__.__name__
-    if classname.find("Conv") != -1:
-        torch.nn.init.normal_(m.weight.data, 0.0, 0.02)
-        if hasattr(m, "bias") and m.bias is not None:
-            torch.nn.init.constant_(m.bias.data, 0.0)
-    elif classname.find("BatchNorm2d") != -1:
-        torch.nn.init.normal_(m.weight.data, 1.0, 0.02)
-        torch.nn.init.constant_(m.bias.data, 0.0)
-
-
-##############################
-#         Generator
-##############################
 
 
 class ResidualBlock(nn.Module):
@@ -39,16 +21,17 @@ class ResidualBlock(nn.Module):
     
 
 class GeneratorResNet(nn.Module):
-    def __init__(self, input_shape, num_residual_blocks):
+    def __init__(self, input_shape, output_shape, num_residual_blocks):
         super(GeneratorResNet, self).__init__()
 
-        channels = input_shape[0]
+        in_channels = input_shape[0]
+        out_channels = output_shape[0]
 
         # Initial convolution block
         out_features = 64
         model = [
-            nn.ReflectionPad2d(channels),
-            nn.Conv2d(channels, out_features, 7),
+            nn.ReflectionPad2d(in_channels),
+            nn.Conv2d(in_channels, out_features, 7),
             nn.InstanceNorm2d(out_features),
             nn.ReLU(inplace=True),
         ]
@@ -80,17 +63,12 @@ class GeneratorResNet(nn.Module):
             in_features = out_features
 
         # Output layer
-        model += [nn.ReflectionPad2d(channels), nn.Conv2d(out_features, channels, 7), nn.Tanh()]
+        model += [nn.ReflectionPad2d(out_channels), nn.Conv2d(out_features, out_channels, 7), nn.Tanh()]
 
         self.model = nn.Sequential(*model)
 
     def forward(self, x):
         return self.model(x)
-
-
-##############################
-#        Discriminator
-##############################
 
 
 class Discriminator(nn.Module):
@@ -111,6 +89,7 @@ class Discriminator(nn.Module):
             layers.append(nn.LeakyReLU(0.2, inplace=True))
             
             return layers
+
 
         self.model = nn.Sequential(
             *discriminator_block(channels, 64, normalize=False),

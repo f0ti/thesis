@@ -165,7 +165,6 @@ class WganGP(GANLoss):
         fake_samples: Tensor,
         depth: int,
         alpha: float,
-        labels: Optional[Tensor] = None,
     ) -> Tensor:
         real_scores = discriminator(real_samples, depth, alpha)
         fake_scores = discriminator(fake_samples, depth, alpha)

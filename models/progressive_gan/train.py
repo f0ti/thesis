@@ -66,7 +66,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--epochs", action="store", type=list, required=False, nargs="+",
                         default=[3, 3, 5, 5, 10, 15, 20],  # because there are 7 stages
                         help="number of epochs over the training dataset per stage")
-    # ************** IMPORTANT HYPERPARAMETER
+    # ************** IMPORTANT HYPERPARAMETERx  
     parser.add_argument("--batch_sizes", action="store", type=list, required=False, nargs="+",
                         default=[8, 8, 8, 4, 4, 2, 1],  # (4x4), (8x8), (16x16), (32x32), (64x64), (128x128), (256x256)
                         help="batch size used for training the model per stage")
@@ -76,7 +76,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--fade_in_percentages", action="store", type=int, required=False, nargs="+",
                         default=[50 for _ in range(7)],
                         help="number of iterations for which fading of new layer happens. Measured in percentage")
-    parser.add_argument("--loss_fn", action="store", type=str2GANLoss, required=False, default="standard_gan",
+    parser.add_argument("--loss_fn", action="store", type=str2GANLoss, required=False, default="wgan_gp",
                         help="loss function used for training the GAN. "
                              "Current options: [wgan_gp, standard_gan]")
     parser.add_argument("--g_lrate", action="store", type=float, required=False, default=0.003,

@@ -1,12 +1,14 @@
 import argparse
 from pathlib import Path
+from pkgutil import get_data
 
 import torch
 from torch.backends import cudnn
+from torch.utils.data import Dataset
 
 from networks import create_generator_from_saved_model
 from utils import post_process_generated_images, post_process_coordinate_images, show_diff, show_rgb, show_xyz
-from data import MelbourneXYZRGB, MelbourneZRGB, get_data_loader
+from data import get_data_loader, get_dataset
 
 # turn fast mode on
 cudnn.benchmark = True
@@ -47,13 +49,9 @@ def inference(args: argparse.Namespace) -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # load the data from the trained-model
-    print(f"loading data from the trained model at: {args.model_path}")
     generator = create_generator_from_saved_model(args.model_path, cycleganed=args.cycleganed).to(device)
-
-    # test_set = MelbourneZRGB(dataset=args.dataset_name, image_set="test")
-    test_set = MelbourneXYZRGB(dataset=args.dataset_name, image_set="test")
+    test_set = get_dataset(args.dataset_name)
     test_dl = get_data_loader(test_set, batch_size=args.batch_size)
-
     print("generating random images from the trained generator ...")
     with torch.no_grad():
         for batch in test_dl:
@@ -66,15 +64,13 @@ def inference(args: argparse.Namespace) -> None:
             show_xyz(xyz_imgs, cols=args.batch_size)
             
             # ground truth RGB
-            print(grt_imgs)
             show_rgb(grt_imgs, cols=args.batch_size)
 
             # predicted RGB
-            print(gen_imgs)
             show_rgb(gen_imgs, cols=args.batch_size)
 
             # difference
-            # show_diff(grt_imgs, gen_imgs, cols=args.batch_size)
+            show_diff(grt_imgs, gen_imgs, cols=args.batch_size)
 
 
 def main() -> None:

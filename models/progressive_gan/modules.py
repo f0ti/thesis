@@ -6,7 +6,7 @@ from custom_layers import (
     PixelwiseNorm,
 )
 from torch import Tensor
-from torch.nn import AvgPool2d, Conv2d, ConvTranspose2d, Embedding, LeakyReLU, Module, Sigmoid
+from torch.nn import AvgPool2d, MaxPool2d, Conv2d, ConvTranspose2d, Embedding, LeakyReLU, Module, Sigmoid
 from torch.nn.functional import interpolate
 
 
@@ -25,12 +25,12 @@ class GenInitialBlock(Module):
 
         ConvBlock = EqualizedConv2d if use_eql else Conv2d
 
-        # bring the input feature maps based on the paper (depth=2)                  # in_channels x 256 x 256
-        self.conv1 = ConvBlock(in_channels, 64, kernel_size=3, stride=2, padding=3)  # 64 x 128 x 128
-        self.conv2 = ConvBlock(64, 128, kernel_size=3, stride=2, padding=2)
-        self.conv3 = ConvBlock(128, 128, kernel_size=3, stride=3, padding=1)
-        self.conv4 = ConvBlock(128, 256, kernel_size=3, stride=3, padding=1)
-        self.maxpool = AvgPool2d(2)
+        # bring the input feature maps based on the paper                            # in_channels x 256 x 256
+        self.conv1 = ConvBlock(in_channels, 64, kernel_size=3, stride=2, padding=3)  # 64 x 130 x 130
+        self.conv2 = ConvBlock(64, 128, kernel_size=3, stride=2, padding=2)          # 128 x 66 x 66
+        self.conv3 = ConvBlock(128, 128, kernel_size=3, stride=3, padding=1)         # 128 x 22 x 22
+        self.conv4 = ConvBlock(128, 256, kernel_size=3, stride=3, padding=1)         # 256 x 8 x 8
+        self.avgpool = AvgPool2d(2)                                                  # 256 x 4 x 4
         
         self.pixNorm = PixelwiseNorm()
         self.lrelu = LeakyReLU(0.2)
@@ -41,7 +41,7 @@ class GenInitialBlock(Module):
         x = self.lrelu(self.conv2(x))
         x = self.lrelu(self.conv3(x))
         x = self.lrelu(self.conv4(x))
-        x = self.maxpool(x)
+        x = self.avgpool(x)
         x = self.pixNorm(x)
         return x
 

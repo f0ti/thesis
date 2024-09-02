@@ -85,7 +85,11 @@ def show_xyz(images, cols=4, figsize=(20, 20)):
     for i, ax in enumerate(axs.flat):
         # show only Z channel
         img = images[i]
-        ax.imshow(img[2])
+        if img.shape == (3, 256, 256):
+            img = img[2]
+        else:
+            img = img[0]
+        ax.imshow(img)
         ax.axis('off')
     plt.tight_layout()
     plt.show()

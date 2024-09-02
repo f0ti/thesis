@@ -93,3 +93,4 @@ wandb/
 images/
 models_vault/
 saved_models/
+generated_images/

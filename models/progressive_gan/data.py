@@ -4,6 +4,7 @@ from typing import Any, Optional, Tuple
 
 import os
 import torch
+import argparse
 import numpy as np
 
 from torch.utils.data import DataLoader, Dataset
@@ -63,6 +64,15 @@ def get_data_loader(
         num_workers=num_workers,
         drop_last=True,
     )
+
+
+def get_dataset(dataset_name: str) -> Dataset:
+    if dataset_name == "melbourne-top":
+        return MelbourneXYZRGB(dataset=dataset_name, image_set="test")
+    elif dataset_name == "melbourne-z-top":
+        return MelbourneZRGB(dataset=dataset_name, image_set="test")
+    else:
+        raise ValueError(f"Unknown dataset: {dataset_name}")
 
 
 class MelbourneXYZRGB(Dataset):

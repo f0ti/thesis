@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 from dotenv import load_dotenv
 
 from utils import show_xyz, show_rgb, show_diff
-from data import RGBTileDataset
+from data import MelbourneXYZRGB, MelbourneZRGB
 from model import GeneratorResNet
 
 load_dotenv()
@@ -31,13 +31,13 @@ input_shape = (opt.channels, opt.img_height, opt.img_width)
 
 # load model
 model_path = "saved_models/%s/G_AB_%d.pth" % (opt.run_name, opt.nepochs)
-model_g = GeneratorResNet(input_shape, opt.n_residual_blocks)
+model_g = GeneratorResNet(input_shape, input_shape, opt.n_residual_blocks)
 
 if cuda:
     model_g.cuda()
 model_g.load_state_dict(torch.load(model_path))
 
-test_set = RGBTileDataset(dataset=opt.dataset_name, image_set="test")
+test_set = MelbourneXYZRGB(dataset=opt.dataset_name, image_set="test")
 test_dl = DataLoader(dataset=test_set, num_workers=opt.threads, batch_size=opt.batch_size, shuffle=False)
 
 image_writing_path = "generated_images"

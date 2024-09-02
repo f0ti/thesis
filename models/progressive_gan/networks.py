@@ -216,6 +216,7 @@ class Discriminator(th.nn.Module):
             y = self.from_rgb[-1](x)
 
         y = self.layers[-1](y)
+        print(y)
         return y
 
     def get_save_info(self) -> Dict[str, Any]:
@@ -232,6 +233,7 @@ class Discriminator(th.nn.Module):
 
 def create_generator_from_saved_model(saved_model_path: Path, cycleganed=False) -> Generator:
     # load the data from the saved_model
+    print("loading data from the trained model at: ", saved_model_path)
     loaded_data = torch.load(saved_model_path)
 
     # create a generator from the loaded data:

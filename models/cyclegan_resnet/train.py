@@ -1,5 +1,3 @@
-import argparse
-from ctypes.wintypes import tagRECT
 import os
 import numpy as np
 import itertools
@@ -8,7 +6,10 @@ import time
 import sys
 import wandb
 import torch
+import aim
 
+from math import floor
+from pathlib import Path
 from torchvision.utils import save_image, make_grid
 from torch.utils.data import DataLoader
 
@@ -18,143 +19,198 @@ from loss import *
 from data import *
 from config import *
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--epochs", type=int, default=11, help="number of epochs of training")
-parser.add_argument("--dataset_name", type=str, default="melbourne-z-top", help="name of the dataset")
-parser.add_argument("--batch_size", type=int, default=1, help="size of the batches")
-parser.add_argument("--lr", type=float, default=0.0002, help="adam: learning rate")
-parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")
-parser.add_argument("--b2", type=float, default=0.999, help="adam: decay of first order momentum of gradient")
-parser.add_argument("--decay_epoch", type=int, default=0, help="epoch from which to start lr decay")
-parser.add_argument("--threads", type=int, default=8, help="number of cpu threads to use during batch generation")
-parser.add_argument("--sample_interval", type=int, default=0, help="interval between saving generator outputs")
-parser.add_argument("--ckpt", type=int, default=2, help="interval between saving model checkpoints")
-parser.add_argument("--n_residual_blocks", type=int, default=9, help="number of residual blocks in generator")
-parser.add_argument("--lambda_cyc", type=float, default=8.0, help="cycle loss weight")
-parser.add_argument("--lambda_id", type=float, default=5.0, help="identity loss weight")
-parser.add_argument("--lambda_tv", type=float, default=0.1, help="total variation loss weight")
-parser.add_argument("--lambda_ssim", type=float, default=1.0, help="structural similarity loss weight")
-parser.add_argument("--lambda_sdi", type=float, default=1.0, help="structural distortion index loss weight")
-parser.add_argument("--wb", type=int, default=1, help="weights and biases")
-opt = parser.parse_args()
+def cycle(iterable):
+    while True:
+        for i in iterable:
+            yield i
 
-if opt.wb:
-    wandb.init(project="thesis", config=vars(opt))
+class Trainer():
+    def __init__(
+        self,
+        name = "default",
+        base_dir = ".",
+        model_dir = "saved_models",
+        image_dir = "images",
+        epochs: int = 10,
+        dataset_name: str = "melbourne-z-top",
+        image_size: int = 256,
+        input_image_channel: int = 3,
+        target_image_channel: int = 3,
+        batch_size: int = 1,
+        lr_gen = 5e-5,
+        lr_disc = 4e-4,
+        target_lr_gen = 1e-5,
+        target_lr_disc = 1e-4,
+        lr_decay_span = 5,
+        b1: float = 0.5,
+        b2: float = 0.999,
+        threads: int = 8,
+        sample_every: int = 0,
+        save_every: int = 2,
+        n_residual_blocks: int = 9,
+        loss_fns: list = ["gan", "cycle", "identity", "tv", "ssim", "sdi"],
+        loss_weights: list = [1.0, 10.0, 5.0, 0.1, 1.0, 1.0],
+        calculate_fid_every = None,
+        calculate_fid_num_images = 1000,
+        clear_fid_cache = False,
+        log: bool = True
+    ):
+        self.name = name,
 
-# Create sample and checkpoint directories
-if opt.sample_interval:
-    os.makedirs("images/%s" % opt.dataset_name, exist_ok=True)
-os.makedirs("saved_models/%s" % opt.dataset_name, exist_ok=True)
+        base_dir = Path(base_dir)
+        self.model_dir = base_dir / model_dir
+        self.image_dir = base_dir / image_dir
+        self.fid_dir = base_dir / 'fid' / name
+        self.config_path = self.model_dir / name / '.config.json'
+        self.init_folders()
+        
+        self.epochs = epochs
+        self.dataset_name = dataset_name
+        self.batch_size = batch_size
+        self.optimizers = []
+        self.schedulers = []
+        self.lr_gen = lr_gen
+        self.lr_disc = lr_disc
+        self.target_lr_gen = target_lr_gen
+        self.target_lr_disc = target_lr_disc
+        self.lr_decay_span = lr_decay_span
+        self.b1 = b1
+        self.b2 = b2
+        self.threads = threads
+        self.n_residual_blocks = n_residual_blocks
+        
+        self.loss_fns = loss_fns
+        self.loss_weights = loss_weights
 
-# Losses
-criterion_GAN = torch.nn.MSELoss()
-criterion_cycle = torch.nn.L1Loss()
-criterion_identity = torch.nn.L1Loss()
-criterion_tv = TotalVariationLoss()
-criterion_ssim = SSIMLoss()
-criterion_sdi = SDILoss()
+        self.sample_every = sample_every
+        self.save_every = save_every
 
-cuda = torch.cuda.is_available()
+        self.calculate_fid_every = calculate_fid_every
+        self.calculate_fid_num_images = calculate_fid_num_images
+        self.clear_fid_cache = clear_fid_cache
 
-input_shape = (1, IMAGE_WIDTH, IMAGE_HEIGHT)
-target_shape = (IMAGE_CHANNEL, IMAGE_WIDTH, IMAGE_HEIGHT)
+        self.image_size = image_size
+        self.input_image_channel = input_image_channel
+        self.target_image_channel = target_image_channel
+        if dataset_name == "melbourne-z-top":
+            self.target_image_channel = 1
+        self.input_shape = (self.input_image_channel, self.image_size, self.image_size)
+        self.target_shape = (self.target_image_channel, self.image_size, self.image_size)
 
-# Initialize generator and discriminator
-G_AB = GeneratorResNet(input_shape, opt.n_residual_blocks)
-G_BA = GeneratorResNet(target_shape, opt.n_residual_blocks)
-D_A = Discriminator(target_shape)
-D_B = Discriminator(input_shape)
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-if cuda:
-    G_AB = G_AB.cuda()
-    G_BA = G_BA.cuda()
-    D_A = D_A.cuda()
-    D_B = D_B.cuda()
-    criterion_GAN.cuda()
-    criterion_cycle.cuda()
-    criterion_identity.cuda()
-    criterion_tv.cuda()
-    criterion_ssim.cuda()
-    criterion_sdi.cuda()
+        self.logger = aim.Session(experiment=name) if log else None
 
-G_AB.apply(weights_init_normal)
-G_BA.apply(weights_init_normal)
-D_A.apply(weights_init_normal)
-D_B.apply(weights_init_normal)
+    @property
+    def checkpoint_num(self):
+        return floor(self.epochs // self.save_every)
+    
+    def init_GAN(self):
+        # Initialize generator and discriminator
+        self.G_AB = GeneratorResNet(self.input_shape, self.target_shape, self.n_residual_blocks).to(self.device)
+        self.G_BA = GeneratorResNet(self.input_shape, self.target_shape, self.n_residual_blocks).to(self.device)
+        self.D_A = Discriminator(self.target_shape).to(self.device)
+        self.D_B = Discriminator(self.input_shape).to(self.device)
 
-# Optimizers
-optimizer_G = torch.optim.Adam(
-    itertools.chain(G_AB.parameters(), G_BA.parameters()), lr=opt.lr, betas=(opt.b1, opt.b2)
-)
-optimizer_D_A = torch.optim.Adam(D_A.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2))
-optimizer_D_B = torch.optim.Adam(D_B.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2))
+        # Optimizers
+        self.init_optimizers()
+        
+        # Learning rate update schedulers
+        self.init_schedulers()
 
-# Learning rate update schedulers
-lr_scheduler_G = torch.optim.lr_scheduler.LambdaLR(
-    optimizer_G, lr_lambda=LambdaLR(opt.epochs, opt.decay_epoch).step
-)
-lr_scheduler_D_A = torch.optim.lr_scheduler.LambdaLR(
-    optimizer_D_A, lr_lambda=LambdaLR(opt.epochs, opt.decay_epoch).step
-)
-lr_scheduler_D_B = torch.optim.lr_scheduler.LambdaLR(
-    optimizer_D_B, lr_lambda=LambdaLR(opt.epochs, opt.decay_epoch).step
-)
+        # Buffers of previously generated samples
+        self.fake_A_buffer = ReplayBuffer()
+        self.fake_B_buffer = ReplayBuffer()
 
-# Buffers of previously generated samples
-fake_A_buffer = ReplayBuffer()
-fake_B_buffer = ReplayBuffer()
+    def init_folders(self):
+        os.makedirs(self.model_dir, exist_ok=True)
+        os.makedirs(self.image_dir, exist_ok=True)
+        os.makedirs(self.fid_dir, exist_ok=True)
 
-print('Loading datasets...')
-train_set = MelbourneZRGB(dataset=opt.dataset_name, image_set="train")
-train_dl = DataLoader(dataset=train_set, num_workers=opt.threads, batch_size=opt.batch_size, shuffle=True)
+    def init_optimizers(self):
+        self.optim_G = torch.optim.Adam(itertools.chain(self.G_AB.parameters(), self.G_BA.parameters()), lr=self.lr_disc, betas=(self.b1, self.b2))
+        self.optim_D = torch.optim.Adam(itertools.chain(self.D_A.parameters(), self.D_B.parameters()), lr=self.lr_gen, betas=(self.b1, self.b2))
+        self.optimizers.append(self.optim_G)
+        self.optimizers.append(self.optim_D)
 
-def sample_images(batches_done):
-    """Saves a generated sample from the test set"""
-    test_set = RGBTileDataset(dataset=opt.dataset_name, image_set="test")
-    test_dl = DataLoader(dataset=test_set, num_workers=opt.threads, batch_size=opt.batch_size, shuffle=False)
-    imgs = next(iter(test_dl))
-    G_AB.eval()
-    G_BA.eval()
-    real_A = imgs["A"].cuda()
-    fake_B = G_AB(real_A)
-    real_B = imgs["B"].cuda()
-    fake_A = G_BA(real_B)
-    # Arange images along x-axis
-    real_A = make_grid(real_A, nrow=5, normalize=True)
-    real_B = make_grid(real_B, nrow=5, normalize=True)
-    fake_A = make_grid(fake_A, nrow=5, normalize=True)
-    fake_B = make_grid(fake_B, nrow=5, normalize=True)
-    # Arange images along y-axis
-    image_grid = torch.cat((real_A, fake_B, real_B, fake_A), 1)
-    save_image(image_grid, "images/%s/%s.png" % (opt.dataset_name, batches_done), normalize=False)
+    def init_schedulers(self):
+        D_decay_fn = lambda i: max(1 - i / self.lr_decay_span, 0) + (self.target_lr_disc / self.lr_disc) * min(i / self.lr_decay_span, 1)
+        G_decay_fn = lambda i: max(1 - i / self.lr_decay_span, 0) + (self.target_lr_gen / self.lr_gen) * min(i / self.lr_decay_span, 1)
+        self.lr_sched_D = LambdaLR(self.optim_D, D_decay_fn)
+        self.lr_sched_G = LambdaLR(self.optim_G, G_decay_fn)
+        self.schedulers.append(self.lr_sched_D)
+        self.schedulers.append(self.lr_sched_G)
 
-# ----------
-#  Training
-# ----------
+    def set_data_src(self):
+        if self.dataset_name == "melbourne-top":
+            self.train_set = MelbourneXYZRGB(dataset=self.dataset_name, image_set="train")
+        elif self.dataset_name == "melbourne-z-top":
+            self.train_set = MelbourneZRGB(dataset=self.dataset_name, image_set="train")
+        else:
+            raise ValueError(f"Unknown dataset: {self.dataset_name}")
 
-prev_time = time.time()
-for epoch in range(opt.epochs):
-    for i, batch in enumerate(train_dl):
+        dataloader = DataLoader(dataset=self.train_set, num_workers=self.threads, batch_size=self.batch_size, shuffle=True)
+        self.loader = cycle(dataloader)
 
-        # show_xyz(batch["A"].numpy(), cols=4)
-        # show_rgb(batch["B"].numpy(), cols=4)
+    def _toggle_all_networks(self, mode="train"):
+        for network in (self.G_AB, self.G_BA, self.D_A, self.D_B):
+            if mode.lower() == "train":
+                network.train()
+            elif mode.lower() == "eval":
+                network.eval()
+            else:
+                raise ValueError(f"Unknown mode requested: {mode}")
+ 
+    def update_learning_rate(self):
+        """Update learning rates for all the networks; called at the end of every epoch"""
+        old_lr = self.optimizers[0].param_groups[0]['lr']
+        for scheduler in self.schedulers:
+                scheduler.step()
+        lr = self.optimizers[0].param_groups[0]['lr']
+        print('learning rate %.4f -> %.4f' % (old_lr, lr))
 
-        # Set model input
-        real_A = batch["A"].cuda()
-        real_B = batch["B"].cuda()
+    def save_model(self, epoch):
+        torch.save(self.G_AB.state_dict(), os.path.join(self.model_dir, f"G_AB_{epoch}.pth"))
+        torch.save(self.G_BA.state_dict(), os.path.join(self.model_dir, f"G_AB_{epoch}.pth"))
 
-        # Adversarial ground truths
-        valid = torch.ones((real_A.size(0), *D_A.output_shape)).cuda()
-        fake = torch.zeros((real_A.size(0), *D_A.output_shape)).cuda()
+    def train(self):
+        self.init_GAN()
+        self.set_data_src()
 
-        # ------------------
-        #  Train Generators
-        # ------------------
+        self._toggle_all_networks("train")
 
-        G_AB.train()
-        G_BA.train()
+        total_dis_loss = torch.tensor(0.).to(self.device)
+        total_gen_loss = torch.tensor(0.).to(self.device)
 
-        optimizer_G.zero_grad()
+        batch_size = self.batch_size
+
+        for epoch in range(self.epochs):
+            for i, batch in enumerate(self.loader):
+                epoch_start_time = time.time()
+                iter_start_time = time.time()
+                # Set model input
+                real_A = batch["A"].cuda()
+                real_B = batch["B"].cuda()
+
+                # Adversarial ground truths
+                valid = torch.ones((real_A.size(0), *self.D_A.output_shape)).cuda()
+                fake = torch.zeros((real_A.size(0), *self.D_A.output_shape)).cuda()
+                self.optim_D.zero_grad()
+                self.optim_G.zero_grad()
+
+                self.train_step()
+
+                self.update_learning_rates()
+
+                if self.sample_every and epoch % self.sample_every == 0 and epoch != 0:
+                    self.sample_images(epoch)
+                
+                if self.save_every and epoch % self.save_every == 0 and epoch != 0:
+                    self.save_model(epoch)
+                
+                if self.calculate_fid_every and epoch % self.calculate_fid_every == 0 and epoch != 0:
+                    self.calculate_fid(epoch)
+
 
         # Identity loss
         loss_id_A = criterion_identity(G_BA(real_A), real_A)
@@ -179,7 +235,7 @@ for epoch in range(opt.epochs):
         loss_cycle = (loss_cycle_A + loss_cycle_B) / 2
 
         # Total Variation loss
-        # loss_tv = criterion_tv(fake_A)  # do it onlym for the forward pass
+        # loss_tv = criterion_tv(fake_A)  # do it only for the forward pass A -> B
 
         # Structural Similarity loss
         loss_ssim = criterion_ssim(fake_B, real_B)  # compare what the generator_AB generated with the real B (RGB images)
@@ -198,10 +254,11 @@ for epoch in range(opt.epochs):
         loss_G.backward()
         optimizer_G.step()
 
+        loss_G = optimize_generator()
+
         # -----------------------
         #  Train Discriminator A
         # -----------------------
-        # TODO: Freeze the discriminator weights 1/10
 
         optimizer_D_A.zero_grad()
 
@@ -277,16 +334,30 @@ for epoch in range(opt.epochs):
     lr_scheduler_D_A.step()
     lr_scheduler_D_B.step()
 
-    if opt.ckpt != -1 and epoch != 0 and epoch % opt.ckpt == 0:
-        # Save model checkpoints
-        print("\nSaving models...")
-        if opt.wb and wandb.run is not None:
-            saving_dir = os.path.join("saved_models", wandb.run.name)
-            os.makedirs(saving_dir, exist_ok=True)
-            torch.save(G_AB.state_dict(), os.path.join(saving_dir, f"G_AB_{epoch}.pth"))
-            torch.save(G_BA.state_dict(), os.path.join(saving_dir, f"G_BA_{epoch}.pth"))
-        else:
-            from random import randint
-            saving_dir = os.path.join("saved_models", str(randint(1, 1000)))
-            torch.save(G_AB.state_dict(), os.path.join(saving_dir, f"G_AB_{epoch}.pth"))
-            torch.save(G_BA.state_dict(), os.path.join(saving_dir, f"G_AB_{epoch}.pth"))
+
+# def sample_images(batches_done):
+#     """Saves a generated sample from the test set"""
+#     if opt.height_data:
+#         test_set = MelbourneZRGB(dataset=opt.dataset_name, image_set="test")
+#     else:
+#         test_set = MelbourneXYZRGB(dataset=opt.dataset_name, image_set="test")
+#     test_dl = DataLoader(dataset=test_set, num_workers=opt.threads, batch_size=opt.batch_size, shuffle=False)
+#     imgs = next(iter(test_dl))
+#     G_AB.eval()
+#     G_BA.eval()
+#     real_A = imgs["A"].cuda()
+#     fake_B = G_AB(real_A)
+#     real_B = imgs["B"].cuda()
+#     fake_A = G_BA(real_B)
+#     # Arange images along x-axis
+#     real_A = make_grid(real_A, nrow=5, normalize=True)
+#     real_B = make_grid(real_B, nrow=5, normalize=True)
+#     fake_A = make_grid(fake_A, nrow=5, normalize=True)
+#     fake_B = make_grid(fake_B, nrow=5, normalize=True)
+#     # Arange images along y-axis
+#     image_grid = torch.cat((real_A, fake_B, real_B, fake_A), 1)
+#     save_image(image_grid, "images/%s/%s.png" % (opt.dataset_name, batches_done), normalize=False)
+
+# ----------
+#  Training
+# ----------

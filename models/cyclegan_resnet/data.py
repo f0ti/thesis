@@ -41,7 +41,7 @@ def get_transform(
         ]
     )
 
-class RGBTileDataset(Dataset):
+class MelbourneXYZRGB(Dataset):
     def __init__(
         self,
         dataset: str = "melbourne-top",
@@ -51,7 +51,7 @@ class RGBTileDataset(Dataset):
     ):
         super().__init__()
 
-        assert dataset in ["melbourne-top", "melbourne-z-top"], "Dataset not supported"
+        assert dataset in ["melbourne-top"], "Dataset not supported for XYZRGB"
         assert image_set in ["train", "test", "val"]
 
         self.dataset = dataset
@@ -114,7 +114,7 @@ class MelbourneZRGB(Dataset):
     ):
         super().__init__()
 
-        assert dataset in ["melbourne-top", "melbourne-z-top"], "Dataset not supported"
+        assert dataset in ["melbourne-z-top"], "Dataset not supported for ZRGB"
         assert image_set in ["train", "test", "val"]
 
         self.dataset = dataset
