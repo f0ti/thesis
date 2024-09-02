@@ -25,13 +25,17 @@ class ImageHistogramClustering:
 
     def _get_image_hist(self, path, show=False):
         img = np.load(os.path.join(self.rgb_dir, path)) * 255
+        # get averaged histogram of all channels
+        hist = np.zeros((self.hist_bins, 3))
         for i in self.channels:
-            hist, _ = np.histogram(img[i], bins=self.hist_bins, range=(0, 256))
-            if show:
-                plt.plot(hist)
-                plt.axis('off')
-                plt.show()
-        return hist
+            hist[:, i], _ = np.histogram(img[:, :, i], bins=self.hist_bins, range=(0, 256))
+        
+        if show:
+            plt.plot(hist)
+            plt.axis('off')
+            plt.show()
+
+        return hist.flatten()
 
     def get_full_set_hist(self):
         return [self._get_image_hist(path) for path in self.paths]
@@ -72,10 +76,11 @@ class ImageHistogramClustering:
 
 
 class Splitter():
-    def __init__(self, clusters, dataset_name="melbourne-top", n_clusters=2, split_ratio=0.8, del_artifacts=False):
+    def __init__(self, clusters, dataset_name="melbourne-top", data_type="xyz_data", n_clusters=2, split_ratio=0.8, del_artifacts=False):
         self.root = f"../{dataset_name}"
         self.split_ratio = split_ratio
         self.clusters = clusters
+        self.data_type = data_type
         self.n_clusters = n_clusters
         self.del_artifacts = del_artifacts
 
@@ -84,9 +89,9 @@ class Splitter():
     def split(self):
         # create train and test directories
         os.makedirs(os.path.join(self.root, "train", "rgb_data"), exist_ok=True)
-        os.makedirs(os.path.join(self.root, "train", "z_data"), exist_ok=True)
+        os.makedirs(os.path.join(self.root, "train", self.data_type), exist_ok=True)
         os.makedirs(os.path.join(self.root, "test", "rgb_data"), exist_ok=True)
-        os.makedirs(os.path.join(self.root, "test", "z_data"), exist_ok=True)
+        os.makedirs(os.path.join(self.root, "test", self.data_type), exist_ok=True)
 
         for i in range(self.n_clusters):
             paths = [path for path, label in self.clusters.items() if label == i]
@@ -98,15 +103,15 @@ class Splitter():
             print(f"Cluster {i}: Train {len(train_paths)}, Test {len(test_paths)}")
             for path in train_paths:
                 os.rename(os.path.join(self.root, "rgb_data", path), os.path.join(self.root, "train", "rgb_data", path))
-                os.rename(os.path.join(self.root, "z_data", path), os.path.join(self.root, "train", "z_data", path))
+                os.rename(os.path.join(self.root, self.data_type, path), os.path.join(self.root, "train", self.data_type, path))
             for path in test_paths:
                 os.rename(os.path.join(self.root, "rgb_data", path), os.path.join(self.root, "test", "rgb_data", path))
-                os.rename(os.path.join(self.root, "z_data", path), os.path.join(self.root, "test", "z_data", path))
+                os.rename(os.path.join(self.root, self.data_type, path), os.path.join(self.root, "test", self.data_type, path))
 
         if self.del_artifacts:
             print("Deleting artifacts")
             os.rmdir(os.path.join(self.root, "rgb_data"))
-            os.rmdir(os.path.join(self.root, "z_data"))
+            os.rmdir(os.path.join(self.root, self.data_type))
 
 if __name__ == "__main__":
     dataset_name = sys.argv[1]

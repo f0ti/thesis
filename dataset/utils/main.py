@@ -1,17 +1,29 @@
-import os
-import stat
+import ctypes
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from struct import unpack
-from point import Point
 from typing import List
+
+class Point:
+    def __init__(self, X, Y, Z, R, G, B, intensity, pointId, isEmpty) -> None:
+        self.X: ctypes.c_double = X
+        self.Y: ctypes.c_double = Y
+        self.Z: ctypes.c_double = Z
+        self.R: ctypes.c_uint16 = R
+        self.G: ctypes.c_uint16 = G
+        self.B: ctypes.c_uint16 = B
+        self.pointId: ctypes.c_uint8 = pointId
+        self.intensity: ctypes.c_uint32 = intensity
+        self.isEmpty: ctypes.c_bool = isEmpty
+
+    def __repr__(self) -> str:
+        return f"{self.pointId}, ({self.X}, {self.Y}, {self.Z}), ({self.R}, {self.G}, {self.B}), {self.intensity}, {self.isEmpty}"
 
 QUIET = True
 
 
 class Tile:
-
     def __init__(self, filename) -> None:
         self.filename = filename
         self.points = []
@@ -130,3 +142,28 @@ class Tile:
         Z = np.clip(Z, 0, 50, dtype=np.float16)
         dtm_name = self.filename.split("/")[-1]
         np.save(f"{root}/{dtm_name}.npy", Z)
+
+# ----------------
+# Debug functions
+# ----------------
+def show_rgb(img):
+    plt.imshow(img)
+    plt.show()
+
+def show_xyz(img):
+    plt.imshow(img[:, :, 2])
+    plt.show()
+
+
+if __name__ == "__main__":
+    # example usage
+    tile_dir = "./Tile_+003_+005_0_0"
+    tile = Tile(tile_dir)
+    # save tile to array
+    tile.save_xyz(".")
+    
+    # open np array image
+    img_dir = "./Tile_+003_+005_0_0.npy"
+    img = np.load(img_dir)
+    show_xyz(img)
+    print(img[0])

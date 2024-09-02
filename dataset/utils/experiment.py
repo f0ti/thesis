@@ -22,12 +22,16 @@ def show_xyz(img):
     plt.imshow(img[:, :, 2])
     plt.show()
 
-dataset_path = "../melbourne-z-top/rgb_data"
-for dir in os.listdir(dataset_path):
-    img = np.load(os.path.join(dataset_path, dir))
-    show_rgb(img)
-    print(img.shape)
-    break
+dir = "../melbourne-top/test/rgb_data/Tile_+003_+005_0_0.npy"
+img = np.load(dir)
+show_rgb(img)
+
+# dataset_path = "../melbourne-z-top/rgb_data"
+# for dir in os.listdir(dataset_path):
+#     img = np.load(os.path.join(dataset_path, dir))
+#     show_rgb(img)
+#     print(img.shape)
+#     break
 
 # for dir in os.listdir("../melbourne-top/cluster_0"):
 #     img = np.load(f"../melbourne-top/cluster_0/{dir}")
@@ -38,9 +42,11 @@ for dir in os.listdir(dataset_path):
 #     show_rgb(img)
 
 # for dir in os.listdir("../melbourne-top/xyz_data"):
+#     print(dir)
 #     img = np.load(f"../melbourne-top/xyz_data/{dir}")
+#     print(img[0])
 #     print(img.min(), img.max())
-#     show_rgb(img)
+#     # show_xyz(img)
 #     break
 # tile = Tile(img)
 
@@ -77,3 +83,33 @@ for dir in os.listdir(dataset_path):
 # plt.tight_layout()
 # plt.show()
 
+# import numpy as np
+# import matplotlib.pyplot as plt
+
+# # Assuming 'xyz_data' is a 3D numpy array with shape (height, width, 3)
+# # where xyz_data[:, :, 2] contains the Z values
+
+# sample_filename = "../melbourne-z-top/test/z_data/Tile_+003_+005_4_2.npy"
+# Z = np.load(sample_filename)
+
+# print(Z.shape)
+
+# # Normalize Z values
+# Z_min = np.min(Z)
+# Z_max = np.max(Z)
+# Z_normalized = (Z - Z_min) / (Z_max - Z_min)
+
+# print(Z_normalized.shape)
+
+# # Map normalized Z values to colors using a colormap
+# # 'jet' goes from blue (low values) to red (high values)
+# colormap = plt.cm.jet
+# elevation_map = colormap(Z_normalized)
+# elevation_map = np.squeeze(elevation_map)
+
+# print(elevation_map.shape)
+
+# # Display the elevation map
+# plt.imshow(elevation_map)
+# plt.colorbar(label='Elevation')
+# plt.show()
