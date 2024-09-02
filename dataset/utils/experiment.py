@@ -17,12 +17,12 @@ def show_rgb(img):
     plt.imshow(img)
     plt.show()
 
-
 def show_xyz(img):
     plt.imshow(img[:, :, 2])
     plt.show()
 
-dir = "../melbourne-top/test/rgb_data/Tile_+003_+005_0_0.npy"
+filename = "Tile_+014_+014_2_3.npy"
+dir = "../melbourne-top/rgb_data/%s" % filename
 img = np.load(dir)
 show_rgb(img)
 

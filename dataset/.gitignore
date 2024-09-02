@@ -1,2 +1,5 @@
 melbourne*/
 utils/experiment.py
+*.pt
+*.txt
+filtered_out*/
