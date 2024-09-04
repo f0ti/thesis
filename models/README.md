@@ -1,3 +1,9 @@
-Different models that will be used during this research require a different structure of the dataset folders and different ways to run the model. In this README the relevant guides will be explained for each of the models.
+Implemented models are the following:
 
-```base/pytorch-CycleGAN-and-pix2pix```
+- Pix2Pix Unet (3→3)
+- Pix2Pix Resnet (3→3)
+- CycleGAN Resnet (3→3, 1→3(under dev))
+- CycleGAN Unet (under dev)
+- Progressive Growing of GANs (3→3, 1→3)
+
+*inside brackets are the translated image channels
