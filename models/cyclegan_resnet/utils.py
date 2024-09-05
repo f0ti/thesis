@@ -5,8 +5,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import torch.nn.init as init
 
-from torch.optim import lr_scheduler
-from torch.autograd import Variable
 from typing import Tuple
 from torch import Tensor
 
@@ -50,33 +48,7 @@ def init_weights(m, init_type='normal', init_gain=0.02):
             init.normal_(m.weight.data, 1.0, init_gain)
             init.constant_(m.bias.data, 0.0)
 
-    print("Initializing weights with %s" % init_type)
     m.apply(init_func)
-
-
-def get_scheduler(optimizer, lr_policy, n_epochs, n_epochs_decay):
-    """Return a learning rate scheduler
-
-    Parameters:
-        optimizer          -- the optimizer of the network
-        opt (option class) -- stores all the experiment flags; needs to be a subclass of BaseOptions
-                              opt.lr_policy is the name of learning rate policy: linear | step | plateau | cosine
-
-    For 'linear', we keep the same learning rate for the first <opt.n_epochs> epochs
-    and linearly decay the rate to zero over the next <opt.n_epochs_decay> epochs.
-    For other schedulers (step, plateau, and cosine), we use the default PyTorch schedulers.
-    See https://pytorch.org/docs/stable/optim.html for more details.
-    """
-    if opt.lr_policy == 'linear':
-        def lambda_rule(epoch):
-            lr_l = 1.0 - max(0, epoch + epoch_count - n_epochs) / float(n_epochs_decay + 1)
-            return lr_l
-        scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda_rule)
-    elif opt.lr_policy == 'cosine':
-        scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=opt.n_epochs, eta_min=0)
-    else:
-        return NotImplementedError('learning rate policy [%s] is not implemented', opt.lr_policy)
-    return scheduler
 
 # ----------------
 # Debug functions
@@ -147,17 +119,7 @@ class ReplayBuffer:
                     self.data[i] = element
                 else:
                     to_return.append(element)
-        return Variable(torch.cat(to_return))
-
-
-class LambdaLR:
-    def __init__(self, n_epochs, decay_start_epoch):
-        assert (n_epochs - decay_start_epoch) > 0, "Decay must start before the training session ends!"
-        self.n_epochs = n_epochs
-        self.decay_start_epoch = decay_start_epoch
-
-    def step(self, epoch):
-        return 1.0 - max(0, epoch - self.decay_start_epoch) / (self.n_epochs - self.decay_start_epoch)
+        return torch.cat(to_return)
 
 
 def print_model_parameters(model):

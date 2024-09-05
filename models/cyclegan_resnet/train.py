@@ -1,17 +1,16 @@
 import os
-import numpy as np
 import itertools
 import datetime
 import time
-import sys
-import wandb
 import torch
 import aim
+import sys
 
 from math import floor
 from pathlib import Path
 from torchvision.utils import save_image, make_grid
 from torch.utils.data import DataLoader
+from torch.optim.lr_scheduler import LambdaLR
 
 from utils import *
 from model import *
@@ -48,12 +47,12 @@ class Trainer():
         sample_every: int = 0,
         save_every: int = 2,
         n_residual_blocks: int = 9,
-        loss_fns: list = ["gan", "cycle", "identity", "tv", "ssim", "sdi"],
-        loss_weights: list = [1.0, 10.0, 5.0, 0.1, 1.0, 1.0],
+        loss_fns: list = ["gan", "cycle", "identity"],
+        loss_weights: list = [10.0, 10.0, 0.5],
         calculate_fid_every = None,
         calculate_fid_num_images = 1000,
         clear_fid_cache = False,
-        log: bool = True
+        pool_size: int = 50,
     ):
         self.name = name,
 
@@ -93,13 +92,15 @@ class Trainer():
         self.input_image_channel = input_image_channel
         self.target_image_channel = target_image_channel
         if dataset_name == "melbourne-z-top":
-            self.target_image_channel = 1
+            self.input_image_channel = 1
         self.input_shape = (self.input_image_channel, self.image_size, self.image_size)
         self.target_shape = (self.target_image_channel, self.image_size, self.image_size)
 
+        self.pool_size = pool_size
+
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        self.logger = aim.Session(experiment=name) if log else None
+        self.logger = aim.Run()
 
     @property
     def checkpoint_num(self):
@@ -107,10 +108,20 @@ class Trainer():
     
     def init_GAN(self):
         # Initialize generator and discriminator
-        self.G_AB = GeneratorResNet(self.input_shape, self.target_shape, self.n_residual_blocks).to(self.device)
-        self.G_BA = GeneratorResNet(self.input_shape, self.target_shape, self.n_residual_blocks).to(self.device)
-        self.D_A = Discriminator(self.target_shape).to(self.device)
-        self.D_B = Discriminator(self.input_shape).to(self.device)
+        self.G_AB = GeneratorResNet(self.input_image_channel, self.target_image_channel, n_blocks=6).to(self.device)
+        self.G_BA = GeneratorResNet(self.target_image_channel, self.input_image_channel, n_blocks=6).to(self.device)
+        self.D_A = PatchDiscriminator(self.input_image_channel).to(self.device)
+        self.D_B = PatchDiscriminator(self.target_image_channel).to(self.device)
+
+        # self.print_networks()
+
+        init_weights(self.G_AB)
+        init_weights(self.G_BA)
+        init_weights(self.D_A)
+        init_weights(self.D_B)
+
+        # Losses
+        self.init_losses()
 
         # Optimizers
         self.init_optimizers()
@@ -119,8 +130,8 @@ class Trainer():
         self.init_schedulers()
 
         # Buffers of previously generated samples
-        self.fake_A_buffer = ReplayBuffer()
-        self.fake_B_buffer = ReplayBuffer()
+        self.fake_A_buffer = ReplayBuffer(self.pool_size)
+        self.fake_B_buffer = ReplayBuffer(self.pool_size)
 
     def init_folders(self):
         os.makedirs(self.model_dir, exist_ok=True)
@@ -141,6 +152,16 @@ class Trainer():
         self.schedulers.append(self.lr_sched_D)
         self.schedulers.append(self.lr_sched_G)
 
+    def init_losses(self):
+        self.criterion_GAN = torch.nn.MSELoss()
+        self.criterion_cycle = torch.nn.L1Loss()
+        self.criterion_identity = torch.nn.L1Loss()
+        # self.criterion_tv = TVLoss()
+        self.lambda_GAN = self.loss_weights[self.loss_fns.index("gan")]
+        self.lambda_cycle = self.loss_weights[self.loss_fns.index("cycle")]
+        self.lambda_identity = self.loss_weights[self.loss_fns.index("identity")]
+        # self.lambda_tv = self.loss_weights[self.loss_fns.index("tv")]
+
     def set_data_src(self):
         if self.dataset_name == "melbourne-top":
             self.train_set = MelbourneXYZRGB(dataset=self.dataset_name, image_set="train")
@@ -149,8 +170,12 @@ class Trainer():
         else:
             raise ValueError(f"Unknown dataset: {self.dataset_name}")
 
-        dataloader = DataLoader(dataset=self.train_set, num_workers=self.threads, batch_size=self.batch_size, shuffle=True)
-        self.loader = cycle(dataloader)
+        self.dataloader = DataLoader(dataset=self.train_set, num_workers=self.threads, batch_size=self.batch_size, shuffle=True)
+
+    def track(self, value, name):
+        if self.logger is None:
+            return
+        self.logger.track(value, name = name)
 
     def _toggle_all_networks(self, mode="train"):
         for network in (self.G_AB, self.G_BA, self.D_A, self.D_B):
@@ -160,7 +185,13 @@ class Trainer():
                 network.eval()
             else:
                 raise ValueError(f"Unknown mode requested: {mode}")
- 
+
+    def print_networks(self):
+        print(self.G_AB)
+        print(self.G_BA)
+        print(self.D_A)
+        print(self.D_B)
+
     def update_learning_rate(self):
         """Update learning rates for all the networks; called at the end of every epoch"""
         old_lr = self.optimizers[0].param_groups[0]['lr']
@@ -172,192 +203,105 @@ class Trainer():
     def save_model(self, epoch):
         torch.save(self.G_AB.state_dict(), os.path.join(self.model_dir, f"G_AB_{epoch}.pth"))
         torch.save(self.G_BA.state_dict(), os.path.join(self.model_dir, f"G_AB_{epoch}.pth"))
-
+    
     def train(self):
         self.init_GAN()
         self.set_data_src()
-
         self._toggle_all_networks("train")
 
-        total_dis_loss = torch.tensor(0.).to(self.device)
-        total_gen_loss = torch.tensor(0.).to(self.device)
+        # adversarial ground truths
+        valid_patch_A = torch.ones((self.batch_size, *self.D_A.output_shape), requires_grad=False).cuda()
+        fake_patch_A = torch.zeros((self.batch_size, *self.D_A.output_shape), requires_grad=False).cuda()
+        valid_patch_B = torch.ones((self.batch_size, *self.D_B.output_shape), requires_grad=False).cuda()
+        fake_patch_B = torch.zeros((self.batch_size, *self.D_B.output_shape), requires_grad=False).cuda()
 
-        batch_size = self.batch_size
-
+        print(f"valid_patch_A: {valid_patch_A.shape}, fake_patch_A: {fake_patch_A.shape}")
+        print(f"valid_patch_B: {valid_patch_B.shape}, fake_patch_B: {fake_patch_B.shape}")
+        
+        prev_time = time.time()
         for epoch in range(self.epochs):
-            for i, batch in enumerate(self.loader):
-                epoch_start_time = time.time()
-                iter_start_time = time.time()
-                # Set model input
+            for i, batch in enumerate(self.dataloader):
                 real_A = batch["A"].cuda()
                 real_B = batch["B"].cuda()
 
-                # Adversarial ground truths
-                valid = torch.ones((real_A.size(0), *self.D_A.output_shape)).cuda()
-                fake = torch.zeros((real_A.size(0), *self.D_A.output_shape)).cuda()
                 self.optim_D.zero_grad()
                 self.optim_G.zero_grad()
 
-                self.train_step()
+                # train generator
 
-                self.update_learning_rates()
+                # Identity loss
+                # loss_id_A = self.criterion_identity(self.G_BA(real_A), real_A)
+                # loss_id_B = self.criterion_identity(self.G_AB(real_B), real_B)
+                # loss_identity = (loss_id_A + loss_id_B) * 0.5
 
-                if self.sample_every and epoch % self.sample_every == 0 and epoch != 0:
-                    self.sample_images(epoch)
+                # Adversarial loss
+                fake_B = self.G_AB(real_A)  # what generator thinks is B
+                loss_adv_AB = self.criterion_GAN(self.D_B(fake_B), valid_patch_B)
+                fake_A = self.G_BA(real_B)  # what generator thinks is A
+                loss_adv_BA = self.criterion_GAN(self.D_A(fake_A), valid_patch_A)
+                loss_adv_G = (loss_adv_AB + loss_adv_BA) * 0.5
+
+                # Cycle loss
+                recov_A = self.G_BA(fake_B)  # what generator thinks is A after converting B
+                loss_cycle_A = self.criterion_cycle(recov_A, real_A)
+                recov_B = self.G_AB(fake_A)  # what generator thinks is B after converting A
+                loss_cycle_B = self.criterion_cycle(recov_B, real_B)
+                loss_cycle = (loss_cycle_A + loss_cycle_B) / 2
+
+                # Total Variation loss
+                # loss_tv = criterion_tv(fake_A)  # do it only for A>B
+
+                # Total loss (generator)
+                loss_G =  loss_adv_G
+                loss_G += self.lambda_cycle * loss_cycle
+                # loss_G += self.lambda_identity * loss_identity
+                # loss_G += loss_tv * opt.lambda_tv
+                
+                loss_G.backward()
+                self.optim_G.step()
+
+                # train discriminator A
+                loss_real = self.criterion_GAN(self.D_A(real_A), valid_patch_A)  # real loss
+                fake_A_ = self.fake_A_buffer.push_and_pop(fake_A)
+                loss_fake = self.criterion_GAN(self.D_A(fake_A_.detach()), fake_patch_A)  # fake loss
+                loss_D_A = (loss_real + loss_fake) / 2  # total loss
+
+                # train discriminator B
+                loss_real = self.criterion_GAN(self.D_B(real_B), valid_patch_B)  # real loss
+                fake_B_ = self.fake_B_buffer.push_and_pop(fake_B)
+                loss_fake = self.criterion_GAN(self.D_B(fake_B_.detach()), fake_patch_B)  # fake loss
+                loss_D_B = (loss_real + loss_fake) / 2  # total loss
+
+                loss_D = (loss_D_A + loss_D_B) / 2
+
+                loss_D.backward()
+                self.optim_D.step()
+
+                # Determine approximate time left
+                batches_done = epoch * len(self.dataloader) + i
+                batches_left = self.epochs * len(self.dataloader) - batches_done
+                time_left = datetime.timedelta(seconds=batches_left * (time.time() - prev_time))
+                prev_time = time.time()
+
+                # if self.sample_every and epoch % self.sample_every == 0 and epoch != 0:
+                #     self.sample_images(epoch)
                 
                 if self.save_every and epoch % self.save_every == 0 and epoch != 0:
                     self.save_model(epoch)
                 
-                if self.calculate_fid_every and epoch % self.calculate_fid_every == 0 and epoch != 0:
-                    self.calculate_fid(epoch)
+                # if self.calculate_fid_every and epoch % self.calculate_fid_every == 0 and epoch != 0:
+                #     self.calculate_fid(epoch)
 
+                self.logger.track(loss_D.item(), "loss_D")
+                self.logger.track(loss_G.item(), "loss_G")
+                self.logger.track(loss_adv_G.item(), "loss_adv_G")
+                self.logger.track(loss_cycle.item(), "loss_cycle")
+                # self.logger.track(loss_identity.item(), "loss_identity")
+                # self.logger.track(loss_tv.item(), "loss_tv")
+                sys.stdout.write("\r Time left: %s" % str(time_left))
 
-        # Identity loss
-        loss_id_A = criterion_identity(G_BA(real_A), real_A)
-        loss_id_B = criterion_identity(G_AB(real_B), real_B)
-    
-        loss_identity = (loss_id_A + loss_id_B) / 2
+            # Update learning rates
+            self.update_learning_rate()
 
-        # GAN loss
-        fake_B = G_AB(real_A)
-        loss_GAN_AB = criterion_GAN(D_B(fake_B), valid)
-        fake_A = G_BA(real_B)
-        loss_GAN_BA = criterion_GAN(D_A(fake_A), valid)
-
-        loss_GAN = (loss_GAN_AB + loss_GAN_BA) / 2
-
-        # Cycle loss
-        recov_A = G_BA(fake_B)
-        loss_cycle_A = criterion_cycle(recov_A, real_A)
-        recov_B = G_AB(fake_A)
-        loss_cycle_B = criterion_cycle(recov_B, real_B)
-
-        loss_cycle = (loss_cycle_A + loss_cycle_B) / 2
-
-        # Total Variation loss
-        # loss_tv = criterion_tv(fake_A)  # do it only for the forward pass A -> B
-
-        # Structural Similarity loss
-        loss_ssim = criterion_ssim(fake_B, real_B)  # compare what the generator_AB generated with the real B (RGB images)
-
-        # Structural Distortion Index loss
-        loss_sdi = criterion_sdi(fake_B, real_B)  # compare what the generator_AB generated with the real B (RGB images)
-
-        # Total losses (generator)
-        loss_G =  loss_GAN
-        loss_G += opt.lambda_cyc * loss_cycle
-        loss_G += opt.lambda_id * loss_identity
-        # loss_G += loss_tv * opt.lambda_tv
-        loss_G += loss_sdi * opt.lambda_sdi
-        loss_G += loss_ssim * opt.lambda_ssim
-
-        loss_G.backward()
-        optimizer_G.step()
-
-        loss_G = optimize_generator()
-
-        # -----------------------
-        #  Train Discriminator A
-        # -----------------------
-
-        optimizer_D_A.zero_grad()
-
-        # Real loss
-        loss_real = criterion_GAN(D_A(real_A), valid)
-        # Fake loss (on batch of previously generated samples)
-        fake_A_ = fake_A_buffer.push_and_pop(fake_A)
-        loss_fake = criterion_GAN(D_A(fake_A_.detach()), fake)
-        # Total loss
-        loss_D_A = (loss_real + loss_fake) / 2
-
-        loss_D_A.backward()
-        optimizer_D_A.step()
-
-        # -----------------------
-        #  Train Discriminator B
-        # -----------------------
-
-        optimizer_D_B.zero_grad()
-
-        # Real loss
-        loss_real = criterion_GAN(D_B(real_B), valid)
-        # Fake loss (on batch of previously generated samples)
-        fake_B_ = fake_B_buffer.push_and_pop(fake_B)
-        loss_fake = criterion_GAN(D_B(fake_B_.detach()), fake)
-        # Total loss
-        loss_D_B = (loss_real + loss_fake) / 2
-
-        loss_D_B.backward()
-        optimizer_D_B.step()
-
-        loss_D = (loss_D_A + loss_D_B) / 2
-
-        # --------------
-        #  Log Progress
-        # --------------
-
-        # Determine approximate time left
-        batches_done = epoch * len(train_dl) + i
-        batches_left = opt.epochs * len(train_dl) - batches_done
-        time_left = datetime.timedelta(seconds=batches_left * (time.time() - prev_time))
-        prev_time = time.time()
-
-        if opt.wb:
-            wandb.log({"Loss_D": loss_D.item(), "Loss_G": loss_G.item(), "ssim": loss_ssim.item(), "sdi": loss_sdi.item(), "adv": loss_GAN.item(), "cycle": loss_cycle.item(), "identity": loss_identity.item()})
-
-        # Print log
-        sys.stdout.write(
-            "\r[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f, adv: %f, sdi: %f, cycle: %f, identity: %f] ETA: %s"
-            % (
-                epoch,
-                opt.epochs,
-                i,
-                len(train_dl),
-                loss_D.item(),
-                loss_G.item(),
-                loss_GAN.item(),
-                loss_sdi.item(),
-                # loss_ssim.item(),
-                loss_cycle.item(),
-                loss_identity.item(),
-                time_left,
-            )
-        )
-
-        # If at sample interval save image
-        if opt.sample_interval:
-            if batches_done % opt.sample_interval == 0:
-                sample_images(batches_done)
-
-    # Update learning rates
-    lr_scheduler_G.step()
-    lr_scheduler_D_A.step()
-    lr_scheduler_D_B.step()
-
-
-# def sample_images(batches_done):
-#     """Saves a generated sample from the test set"""
-#     if opt.height_data:
-#         test_set = MelbourneZRGB(dataset=opt.dataset_name, image_set="test")
-#     else:
-#         test_set = MelbourneXYZRGB(dataset=opt.dataset_name, image_set="test")
-#     test_dl = DataLoader(dataset=test_set, num_workers=opt.threads, batch_size=opt.batch_size, shuffle=False)
-#     imgs = next(iter(test_dl))
-#     G_AB.eval()
-#     G_BA.eval()
-#     real_A = imgs["A"].cuda()
-#     fake_B = G_AB(real_A)
-#     real_B = imgs["B"].cuda()
-#     fake_A = G_BA(real_B)
-#     # Arange images along x-axis
-#     real_A = make_grid(real_A, nrow=5, normalize=True)
-#     real_B = make_grid(real_B, nrow=5, normalize=True)
-#     fake_A = make_grid(fake_A, nrow=5, normalize=True)
-#     fake_B = make_grid(fake_B, nrow=5, normalize=True)
-#     # Arange images along y-axis
-#     image_grid = torch.cat((real_A, fake_B, real_B, fake_A), 1)
-#     save_image(image_grid, "images/%s/%s.png" % (opt.dataset_name, batches_done), normalize=False)
-
-# ----------
-#  Training
-# ----------
+trainer = Trainer()
+trainer.train()

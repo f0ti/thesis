@@ -7,14 +7,15 @@ from cleanfid import fid
 from torch.utils.data import DataLoader
 from dotenv import load_dotenv
 
-from utils import show_xyz, show_rgb, show_diff
-from data import MelbourneXYZRGB, MelbourneZRGB
+from utils import show_xyz, show_rgb, show_diff, adjust_dynamic_range
+from data import MelbourneXYZRGB
 from model import GeneratorResNet
 
 load_dotenv()
 
-parser = argparse.ArgumentParser(description="pix2pix-pytorch-implementation")
+parser = argparse.ArgumentParser(description="cyclegan-resnet-implementation")
 parser.add_argument("--dataset_name", default="melbourne-top")
+parser.add_argument("--model_path", default="G_AB_8.pth")
 parser.add_argument("--threads", type=int, default=8, help="number of cpu threads to use during batch generation")
 parser.add_argument("--batch_size", type=int, default=2, help="size of the batches")
 parser.add_argument("--nepochs", type=int, default=10, help="saved model epochs")
@@ -30,7 +31,7 @@ cuda = True if torch.cuda.is_available() else False
 input_shape = (opt.channels, opt.img_height, opt.img_width)
 
 # load model
-model_path = "saved_models/%s/G_AB_%d.pth" % (opt.run_name, opt.nepochs)
+model_path = opt.model_path
 model_g = GeneratorResNet(input_shape, input_shape, opt.n_residual_blocks)
 
 if cuda:
@@ -49,6 +50,7 @@ for i, batch in enumerate(test_dl):
     xyz_input = batch["A"].cuda()
     out_imgs = model_g(xyz_input)
     label = out_imgs.cpu().data
+    # label = adjust_dynamic_range(out_imgs.cpu().data, (-1.0, 1.0), (0.0, 1.0))
 
     # for img_num in range(opt.batch_size):
     #     print(f"Saving image number {i}_{img_num} out of {len(test_dl)}")
@@ -59,10 +61,11 @@ for i, batch in enumerate(test_dl):
     # print(vsi_score)
 
     # XYZ (only Z)
-    # show_xyz(batch["A"].numpy(), cols=2)
+    show_xyz(batch["A"].numpy(), cols=2)
     
     # ground truth RGB
     show_rgb(batch["B"].numpy(), cols=2)
+    print(label)
 
     # predicted RGB
     show_rgb(label.numpy(), cols=2)

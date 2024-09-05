@@ -51,7 +51,7 @@ class MelbourneXYZRGB(Dataset):
     ):
         super().__init__()
 
-        assert dataset in ["melbourne-top"], "Dataset not supported for XYZRGB"
+        assert dataset in ["melbourne-top", "melbourne-staging"], "Dataset not supported for XYZRGB"
         assert image_set in ["train", "test", "val"]
 
         self.dataset = dataset
@@ -108,8 +108,6 @@ class MelbourneZRGB(Dataset):
         dataset: str = "melbourne-z-top",
         image_set: str = "train",
         transform=get_transform(),
-        input_data_range: Tuple[float, float] = (0.0, 1.0),
-        output_data_range: Tuple[float, float] = (-1.0, 1.0),
         max_samples: Optional[int] = None,
     ):
         super().__init__()
@@ -122,8 +120,6 @@ class MelbourneZRGB(Dataset):
         self.image_set = image_set
         self.max_samples = max_samples
         self.transform = transform
-        self.input_data_range = input_data_range
-        self.output_data_range = output_data_range
 
         dataset_path = os.path.join(self.base_dir, self.dataset)
 
@@ -149,13 +145,5 @@ class MelbourneZRGB(Dataset):
         if self.transform is not None:
             input = self.transform(input)
             label = self.transform(label)
-
-        input = adjust_dynamic_range(
-            input, drange_in=self.input_data_range, drange_out=self.output_data_range
-        )
-
-        label = adjust_dynamic_range(
-            label, drange_in=self.input_data_range, drange_out=self.output_data_range
-        )
 
         return {"A": input, "B": label}
