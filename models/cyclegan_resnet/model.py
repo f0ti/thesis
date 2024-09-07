@@ -172,5 +172,4 @@ class Discriminator(nn.Module):
 
     def forward(self, x):
         x = self.model(x)
-        print(x.shape)
         return x

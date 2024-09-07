@@ -28,7 +28,6 @@ def cycle(iterable):
 class Trainer():
     def __init__(
         self,
-        name: str = "default",
         base_dir = ".",
         model_dir = "saved_models",
         image_dir = "saved_images",
@@ -52,10 +51,9 @@ class Trainer():
         n_residual_blocks: int = 9,
         loss_fns: list = ["gan", "cycle", "identity", "ssim"],
         loss_weights: list = [10.0, 10.0, 0.5, 2.0],
-        calculate_fid_every: int = 10,
+        calculate_fid_every: int = 2,
         calculate_fid_num_images: int = 1000,
-        eval_num: int = 100,
-        eval_batch_size: int = 8,
+        calculate_fid_batch_size: int = 8,
         pool_size: int = 50,
     ):
         self.name = str(datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
@@ -63,8 +61,7 @@ class Trainer():
         base_dir = Path(base_dir)
         self.model_dir = base_dir / model_dir / self.name
         self.image_dir = base_dir / image_dir / self.name
-        self.fid_dir = base_dir / 'fid' / name
-        self.config_path = self.model_dir / name / '.config.json'
+        self.fid_dir = base_dir / 'fid' / self.name
         self.init_folders()
         
         self.epochs = epochs
@@ -91,8 +88,7 @@ class Trainer():
 
         self.calculate_fid_every = calculate_fid_every
         self.calculate_fid_num_images = calculate_fid_num_images
-        self.eval_num = eval_num
-        self.eval_batch_size = eval_batch_size
+        self.calculate_fid_batch_size = calculate_fid_batch_size
         self.fid = 0
 
         self.image_size = image_size
@@ -106,7 +102,6 @@ class Trainer():
         self.pool_size = pool_size
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
         self.logger = aim.Run()
 
     @property
@@ -175,17 +170,17 @@ class Trainer():
         if self.dataset_name == "melbourne-top":
             self.train_set = MelbourneXYZRGB(dataset=self.dataset_name, image_set="train")
             self.sample_set = MelbourneXYZRGB(dataset=self.dataset_name, image_set="test", max_samples=self.sample_num)
-            self.eval_set = MelbourneXYZRGB(dataset=self.dataset_name, image_set="test", max_samples=self.eval_num)
+            self.eval_set = MelbourneXYZRGB(dataset=self.dataset_name, image_set="test", max_samples=self.calculate_fid_num_images)
         elif self.dataset_name == "melbourne-z-top":
             self.train_set = MelbourneZRGB(dataset=self.dataset_name, image_set="train")
             self.sample_set = MelbourneZRGB(dataset=self.dataset_name, image_set="test", max_samples=self.sample_num)
-            self.eval_set = MelbourneZRGB(dataset=self.dataset_name, image_set="test", max_samples=self.eval_num)
+            self.eval_set = MelbourneZRGB(dataset=self.dataset_name, image_set="test", max_samples=self.calculate_fid_num_images)
         else:
             raise ValueError(f"Unknown dataset: {self.dataset_name}")
 
         self.dataloader = DataLoader(dataset=self.train_set, num_workers=self.threads, batch_size=self.batch_size, shuffle=True)
         self.sample_dl = DataLoader(dataset=self.sample_set, num_workers=self.threads, batch_size=self.sample_num, shuffle=False)
-        self.eval_dl = DataLoader(dataset=self.sample_set, num_workers=self.threads, batch_size=self.eval_batch_size, shuffle=False)
+        self.eval_dl = DataLoader(dataset=self.sample_set, num_workers=self.threads, batch_size=self.calculate_fid_batch_size, shuffle=False)
 
     def track(self, value, name):
         if self.logger is None:
