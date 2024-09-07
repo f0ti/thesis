@@ -45,7 +45,7 @@ class Trainer():
         b1: float = 0.5,
         b2: float = 0.999,
         threads: int = 8,
-        sample_every: int = 10,
+        sample_every: int = 500,
         sample_num: int = 9,
         save_every: int = 2,
         n_residual_blocks: int = 9,
@@ -345,7 +345,7 @@ class Trainer():
                 if self.save_every and epoch % self.save_every == 0 and epoch != 0:
                     self.save_model(epoch)
                 
-                if self.calculate_fid_every and epoch % self.calculate_fid_every == 0:
+                if self.calculate_fid_every and epoch % self.calculate_fid_every == 0 and epoch != 0:
                         self.calculate_fid(epoch)
 
                 self.logger.track(loss_D.item(), "loss_D")
