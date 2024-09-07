@@ -1,12 +1,14 @@
-import glob
-import random
 import os
-import numpy as np
+from sympy import imageset
 import torch
-from typing import Optional, Callable, Tuple, Any
+import numpy as np
+
+from typing import Optional, Tuple, Any
 from torch.utils.data import Dataset
 from torchvision.transforms import v2
+from PIL import Image
 from dotenv import load_dotenv
+
 from utils import adjust_dynamic_range
 
 load_dotenv()
@@ -46,19 +48,18 @@ class MelbourneXYZRGB(Dataset):
         self,
         dataset: str = "melbourne-top",
         image_set: str = "train",
-        transform: Optional[Callable] = None,
         max_samples: Optional[int] = None,
     ):
         super().__init__()
 
-        assert dataset in ["melbourne-top", "melbourne-staging"], "Dataset not supported for XYZRGB"
+        assert dataset in ["melbourne-top"], "Dataset not supported for XYZRGB"
         assert image_set in ["train", "test", "val"]
 
         self.dataset = dataset
         self.base_dir = os.environ.get("DATASET_ROOT") or "."
         self.image_set = image_set
         self.max_samples = max_samples
-        self.transform = transform
+        self.transform = get_transform()
 
         dataset_path = os.path.join(self.base_dir, self.dataset)
 
@@ -68,20 +69,6 @@ class MelbourneXYZRGB(Dataset):
         self.rgb_samples = sorted(os.listdir(self.rgb_path))[:max_samples]
 
         assert len(self.rgb_samples) == len(self.xyz_samples), "Number of samples in RGB and XYZ folders do not match"
-
-        self.input_transforms = v2.Compose(
-            [
-                v2.ToTensor(),
-                v2.ToDtype(torch.float32),
-            ]
-        )
-
-        self.label_transforms = v2.Compose(
-            [
-                v2.ToTensor(),
-                v2.ToDtype(torch.float32),
-            ]
-        )
 
     def __len__(self) -> int:
         return len(self.rgb_samples)
@@ -93,8 +80,8 @@ class MelbourneXYZRGB(Dataset):
         input = np.load(input_path)
         label = np.load(label_path)
 
-        input = self.input_transforms(input)
-        label = self.label_transforms(label)
+        input = self.transform(input)
+        label = self.transform(label)
 
         return {"A": input, "B": label}
 
@@ -107,7 +94,6 @@ class MelbourneZRGB(Dataset):
         self,
         dataset: str = "melbourne-z-top",
         image_set: str = "train",
-        transform=get_transform(),
         max_samples: Optional[int] = None,
     ):
         super().__init__()
@@ -119,7 +105,7 @@ class MelbourneZRGB(Dataset):
         self.base_dir = os.environ.get("DATASET_ROOT") or "."
         self.image_set = image_set
         self.max_samples = max_samples
-        self.transform = transform
+        self.transform = get_transform()
 
         dataset_path = os.path.join(self.base_dir, self.dataset)
 
@@ -145,5 +131,47 @@ class MelbourneZRGB(Dataset):
         if self.transform is not None:
             input = self.transform(input)
             label = self.transform(label)
+
+        return {"A": input, "B": label}
+
+
+class Maps(Dataset):
+    def __init__(
+        self,
+        dataset: str = "maps",
+        image_set: str = "train",
+        max_samples: Optional[int] = None,
+    ):
+        super().__init__()
+
+        assert dataset in ["maps"], "Dataset not supported for Maps"
+        assert image_set in ["train", "val"]
+
+        self.dataset = dataset
+        self.base_dir = os.environ.get("DATASET_ROOT") or "."
+        self.image_set = image_set
+        self.max_samples = max_samples
+        self.transform = v2.Compose(
+            [
+                v2.PILToTensor(),
+                v2.Lambda(lambda x: x / 255.0),
+                v2.ToDtype(torch.float32),
+            ]
+        )
+
+        dataset_path = os.path.join(self.base_dir, self.dataset)
+        self.images_path = os.path.join(dataset_path, image_set)
+        self.image_samples = sorted(os.listdir(self.images_path))[:max_samples]
+
+    def __len__(self) -> int:
+        return len(self.image_samples)
+
+    def __getitem__(self, index):
+        img = Image.open(os.path.join(self.images_path, self.image_samples[index]))
+        img = self.transform(img)  # to tensor
+
+        # half left is input, half right is label
+        input = img[:, :, : img.shape[2] // 2]
+        label = img[:, :, img.shape[2] // 2 :]
 
         return {"A": input, "B": label}
