@@ -72,5 +72,5 @@ def generate_z_data(dataset_name):
 if __name__ == "__main__":
     dataset_name = sys.argv[1]
     generate_rgb_data(dataset_name)
-    generate_xyz_data(dataset_name)
-    # generate_z_data(dataset_name)
+    # generate_xyz_data(dataset_name)
+    generate_z_data(dataset_name)

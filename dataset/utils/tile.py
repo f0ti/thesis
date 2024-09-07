@@ -115,13 +115,11 @@ class Tile:
 
     def save_xyz(self, root) -> None:
         xyz = np.asarray(self.xyz, dtype=np.float32).reshape(self.width, self.height, 3)
-        # xyz = self._scale_xyz(xyz)
         xyz_name = self.filename.split("/")[-1]
         np.save(f"{root}/{xyz_name}.npy", xyz)
 
     def save_z(self, root) -> None:
         z = np.asarray(self.Z, dtype=np.float32).reshape(self.width, self.height, 1)
-        z = self._scale_z(z)
         z_name = self.filename.split("/")[-1]
         np.save(f"{root}/{z_name}.npy", z)
 

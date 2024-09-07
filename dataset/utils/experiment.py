@@ -21,17 +21,16 @@ def show_xyz(img):
     plt.imshow(img[:, :, 2])
     plt.show()
 
-filename = "Tile_+014_+014_2_3.npy"
-dir = "../melbourne-top/rgb_data/%s" % filename
-img = np.load(dir)
-show_rgb(img)
+def show_z(img):
+    plt.imshow(img)
+    plt.show()
 
-# dataset_path = "../melbourne-z-top/rgb_data"
-# for dir in os.listdir(dataset_path):
-#     img = np.load(os.path.join(dataset_path, dir))
-#     show_rgb(img)
-#     print(img.shape)
-#     break
+# show first 5 images of ../melbourne-z-top/train/rgb_data
+
+dataset_path = "../melbourne-z-top/test/rgb_data"
+filename = "Tile_+003_+005_2_2.npy"
+img = np.load(os.path.join(dataset_path, filename))
+show_rgb(img)
 
 # for dir in os.listdir("../melbourne-top/cluster_0"):
 #     img = np.load(f"../melbourne-top/cluster_0/{dir}")

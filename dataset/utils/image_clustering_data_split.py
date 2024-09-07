@@ -93,6 +93,7 @@ class Splitter():
         os.makedirs(os.path.join(self.root, "test", "rgb_data"), exist_ok=True)
         os.makedirs(os.path.join(self.root, "test", self.data_type), exist_ok=True)
 
+        print("Splitting data...")
         for i in range(self.n_clusters):
             paths = [path for path, label in self.clusters.items() if label == i]
             np.random.shuffle(paths)
@@ -118,5 +119,5 @@ if __name__ == "__main__":
     cluster_model = ImageHistogramClustering(dataset_name, n_clusters=2)
     clusters = cluster_model.cluster()
 
-    splitter = Splitter(dataset_name=dataset_name, n_clusters=2, clusters=clusters, split_ratio=0.8, del_artifacts=False)
+    splitter = Splitter(dataset_name=dataset_name, data_type='z_data', n_clusters=2, clusters=clusters, split_ratio=0.8, del_artifacts=False)
     splitter.split()
