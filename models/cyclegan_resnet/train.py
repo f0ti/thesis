@@ -344,9 +344,6 @@ class Trainer():
                 
                 if self.save_every and epoch % self.save_every == 0 and epoch != 0:
                     self.save_model(epoch)
-                
-                if self.calculate_fid_every and epoch % self.calculate_fid_every == 0 and epoch != 0:
-                        self.calculate_fid(epoch)
 
                 self.logger.track(loss_D.item(), "loss_D")
                 self.logger.track(loss_G.item(), "loss_G")
@@ -354,7 +351,6 @@ class Trainer():
                 self.logger.track(loss_cycle.item(), "loss_cycle")
                 # self.logger.track(loss_identity.item(), "loss_identity")
                 # self.logger.track(loss_tv.item(), "loss_tv")
-                self.logger.track(self.fid, "fid")
                 sys.stdout.write(
                     "\r[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f, adv: %f, cycle: %f, ssim: %f] ETA: %s"
                     % (
@@ -370,6 +366,10 @@ class Trainer():
                         time_left,
                     )
                 )
+            
+            if self.calculate_fid_every and epoch % self.calculate_fid_every == 0 and epoch != 0:
+                self.calculate_fid(epoch)
+            self.logger.track(self.fid, "fid")
 
             # Update learning rates
             self.update_learning_rate()
