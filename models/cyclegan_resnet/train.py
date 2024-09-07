@@ -8,15 +8,17 @@ import sys
 
 from math import floor
 from pathlib import Path
+from shutil import rmtree
 from torchvision.utils import save_image, make_grid
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import LambdaLR
+from ignite.engine import Engine
+from ignite.metrics import FID, InceptionScore
 
 from utils import *
 from model import *
 from loss import *
 from data import *
-from config import *
 
 def cycle(iterable):
     while True:
@@ -26,10 +28,10 @@ def cycle(iterable):
 class Trainer():
     def __init__(
         self,
-        name = "default",
+        name: str = "default",
         base_dir = ".",
         model_dir = "saved_models",
-        image_dir = "images",
+        image_dir = "saved_images",
         epochs: int = 10,
         dataset_name: str = "melbourne-z-top",
         image_size: int = 256,
@@ -40,25 +42,27 @@ class Trainer():
         lr_disc = 4e-4,
         target_lr_gen = 1e-5,
         target_lr_disc = 1e-4,
-        lr_decay_span = 5,
+        lr_decay_span: int = 5,
         b1: float = 0.5,
         b2: float = 0.999,
         threads: int = 8,
-        sample_every: int = 0,
+        sample_every: int = 10,
+        sample_num: int = 9,
         save_every: int = 2,
         n_residual_blocks: int = 9,
-        loss_fns: list = ["gan", "cycle", "identity"],
-        loss_weights: list = [10.0, 10.0, 0.5],
-        calculate_fid_every = None,
-        calculate_fid_num_images = 1000,
-        clear_fid_cache = False,
+        loss_fns: list = ["gan", "cycle", "identity", "ssim"],
+        loss_weights: list = [10.0, 10.0, 0.5, 2.0],
+        calculate_fid_every: int = 10,
+        calculate_fid_num_images: int = 1000,
+        eval_num: int = 100,
+        eval_batch_size: int = 8,
         pool_size: int = 50,
     ):
-        self.name = name,
+        self.name = str(datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
 
         base_dir = Path(base_dir)
-        self.model_dir = base_dir / model_dir
-        self.image_dir = base_dir / image_dir
+        self.model_dir = base_dir / model_dir / self.name
+        self.image_dir = base_dir / image_dir / self.name
         self.fid_dir = base_dir / 'fid' / name
         self.config_path = self.model_dir / name / '.config.json'
         self.init_folders()
@@ -82,11 +86,14 @@ class Trainer():
         self.loss_weights = loss_weights
 
         self.sample_every = sample_every
+        self.sample_num = sample_num
         self.save_every = save_every
 
         self.calculate_fid_every = calculate_fid_every
         self.calculate_fid_num_images = calculate_fid_num_images
-        self.clear_fid_cache = clear_fid_cache
+        self.eval_num = eval_num
+        self.eval_batch_size = eval_batch_size
+        self.fid = 0
 
         self.image_size = image_size
         self.input_image_channel = input_image_channel
@@ -156,21 +163,29 @@ class Trainer():
         self.criterion_GAN = torch.nn.MSELoss()
         self.criterion_cycle = torch.nn.L1Loss()
         self.criterion_identity = torch.nn.L1Loss()
+        self.criterion_ssim = SSIMLoss().to(self.device)
         # self.criterion_tv = TVLoss()
         self.lambda_GAN = self.loss_weights[self.loss_fns.index("gan")]
         self.lambda_cycle = self.loss_weights[self.loss_fns.index("cycle")]
         self.lambda_identity = self.loss_weights[self.loss_fns.index("identity")]
+        self.lambda_ssim = self.loss_weights[self.loss_fns.index("ssim")]
         # self.lambda_tv = self.loss_weights[self.loss_fns.index("tv")]
 
     def set_data_src(self):
         if self.dataset_name == "melbourne-top":
             self.train_set = MelbourneXYZRGB(dataset=self.dataset_name, image_set="train")
+            self.sample_set = MelbourneXYZRGB(dataset=self.dataset_name, image_set="test", max_samples=self.sample_num)
+            self.eval_set = MelbourneXYZRGB(dataset=self.dataset_name, image_set="test", max_samples=self.eval_num)
         elif self.dataset_name == "melbourne-z-top":
             self.train_set = MelbourneZRGB(dataset=self.dataset_name, image_set="train")
+            self.sample_set = MelbourneZRGB(dataset=self.dataset_name, image_set="test", max_samples=self.sample_num)
+            self.eval_set = MelbourneZRGB(dataset=self.dataset_name, image_set="test", max_samples=self.eval_num)
         else:
             raise ValueError(f"Unknown dataset: {self.dataset_name}")
 
         self.dataloader = DataLoader(dataset=self.train_set, num_workers=self.threads, batch_size=self.batch_size, shuffle=True)
+        self.sample_dl = DataLoader(dataset=self.sample_set, num_workers=self.threads, batch_size=self.sample_num, shuffle=False)
+        self.eval_dl = DataLoader(dataset=self.sample_set, num_workers=self.threads, batch_size=self.eval_batch_size, shuffle=False)
 
     def track(self, value, name):
         if self.logger is None:
@@ -202,9 +217,52 @@ class Trainer():
 
     def save_model(self, epoch):
         torch.save(self.G_AB.state_dict(), os.path.join(self.model_dir, f"G_AB_{epoch}.pth"))
-        torch.save(self.G_BA.state_dict(), os.path.join(self.model_dir, f"G_AB_{epoch}.pth"))
     
+    def sample_images(self, epoch, sample_num):
+        self._toggle_all_networks("eval")
+
+        fake_images = Tensor([]).to(self.device)
+        for i, batch in enumerate(self.sample_dl):
+            real_A = batch["A"].to(self.device)
+            fake_images = torch.cat((fake_images, self.G_AB(real_A)), 0)
+
+            # save_image(fake_B, os.path.join(self.image_dir, f"fake_B_{epoch}_{sample_num}_{i}.png"))  # save individual images
+
+        # make a grid of all the images
+        n_rows = 3
+        grid = make_grid(fake_images, nrow=n_rows, normalize=True)
+        save_image(grid, os.path.join(self.image_dir, f"fake_B_{epoch}_{sample_num}.png"))
+
+        self._toggle_all_networks("train")
+    
+    def calculate_fid(self, epoch):
+        def eval_step(engine, batch):
+            return batch
+
+        default_evaluator = Engine(eval_step)
+        fid_metric = FID()
+        fid_metric.attach(default_evaluator, "fid")
+        
+        # get evaluation samples
+        with torch.no_grad():
+            self.G_AB.eval()
+            fake, real = Tensor([]).to(self.device), Tensor([]).to(self.device)
+            for eval_batch in self.eval_dl:
+                fake = torch.cat((fake, self.G_AB(eval_batch["A"].to(self.device))), 0)
+                real = torch.cat((real, eval_batch["B"].to(self.device)), 0)
+
+            state = default_evaluator.run([[fake, real]])
+            self.G_AB.train()
+        
+        self.fid = state.metrics["fid"]
+
+        # write to file
+        with open(self.fid_dir / f"fid.txt", "a") as f:
+            f.write(f"{epoch},{self.fid}\n")
+
     def train(self):
+        print(f"Starting training {self.name}")
+
         self.init_GAN()
         self.set_data_src()
         self._toggle_all_networks("train")
@@ -214,9 +272,6 @@ class Trainer():
         fake_patch_A = torch.zeros((self.batch_size, *self.D_A.output_shape), requires_grad=False).cuda()
         valid_patch_B = torch.ones((self.batch_size, *self.D_B.output_shape), requires_grad=False).cuda()
         fake_patch_B = torch.zeros((self.batch_size, *self.D_B.output_shape), requires_grad=False).cuda()
-
-        print(f"valid_patch_A: {valid_patch_A.shape}, fake_patch_A: {fake_patch_A.shape}")
-        print(f"valid_patch_B: {valid_patch_B.shape}, fake_patch_B: {fake_patch_B.shape}")
         
         prev_time = time.time()
         for epoch in range(self.epochs):
@@ -246,14 +301,20 @@ class Trainer():
                 loss_cycle_A = self.criterion_cycle(recov_A, real_A)
                 recov_B = self.G_AB(fake_A)  # what generator thinks is B after converting A
                 loss_cycle_B = self.criterion_cycle(recov_B, real_B)
-                loss_cycle = (loss_cycle_A + loss_cycle_B) / 2
+                loss_cycle = (loss_cycle_A + loss_cycle_B) * 0.5
 
                 # Total Variation loss
                 # loss_tv = criterion_tv(fake_A)  # do it only for A>B
 
+                # Structural Similarity loss
+                loss_ssim_G_A = self.criterion_ssim(fake_A, real_A)
+                loss_ssim_G_B = self.criterion_ssim(fake_B, real_B)
+                loss_ssim = (loss_ssim_G_A + loss_ssim_G_B) * 0.5
+
                 # Total loss (generator)
                 loss_G =  loss_adv_G
                 loss_G += self.lambda_cycle * loss_cycle
+                loss_G += self.lambda_ssim * loss_ssim
                 # loss_G += self.lambda_identity * loss_identity
                 # loss_G += loss_tv * opt.lambda_tv
                 
@@ -283,14 +344,14 @@ class Trainer():
                 time_left = datetime.timedelta(seconds=batches_left * (time.time() - prev_time))
                 prev_time = time.time()
 
-                # if self.sample_every and epoch % self.sample_every == 0 and epoch != 0:
-                #     self.sample_images(epoch)
+                if self.sample_every and i % self.sample_every == 0:
+                    self.sample_images(epoch, i)
                 
                 if self.save_every and epoch % self.save_every == 0 and epoch != 0:
                     self.save_model(epoch)
                 
-                # if self.calculate_fid_every and epoch % self.calculate_fid_every == 0 and epoch != 0:
-                #     self.calculate_fid(epoch)
+                if self.calculate_fid_every and epoch % self.calculate_fid_every == 0:
+                        self.calculate_fid(epoch)
 
                 self.logger.track(loss_D.item(), "loss_D")
                 self.logger.track(loss_G.item(), "loss_G")
@@ -298,7 +359,22 @@ class Trainer():
                 self.logger.track(loss_cycle.item(), "loss_cycle")
                 # self.logger.track(loss_identity.item(), "loss_identity")
                 # self.logger.track(loss_tv.item(), "loss_tv")
-                sys.stdout.write("\r Time left: %s" % str(time_left))
+                self.logger.track(self.fid, "fid")
+                sys.stdout.write(
+                    "\r[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f, adv: %f, cycle: %f, ssim: %f] ETA: %s"
+                    % (
+                        epoch,
+                        self.epochs,
+                        i,
+                        len(self.dataloader),
+                        loss_D.item(),
+                        loss_G.item(),
+                        loss_adv_G.item(),
+                        loss_cycle.item(),
+                        loss_ssim.item(),
+                        time_left,
+                    )
+                )
 
             # Update learning rates
             self.update_learning_rate()

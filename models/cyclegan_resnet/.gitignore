@@ -91,5 +91,8 @@ ENV/
 dataset/
 wandb/
 saved_models/
-generated_images/
+saved_images/
+saved_gifs/
+fid/
 models_vault/
+.aim/*

@@ -76,6 +76,17 @@ def show_xyz(images, cols=4, figsize=(20, 20)):
     plt.tight_layout()
     plt.show()
 
+def show_z(images, cols=4, figsize=(20, 20)):
+    rows = len(images) // cols
+    fig, axs = plt.subplots(rows, cols, figsize=figsize)
+    for i, ax in enumerate(axs.flat):
+        # show only Z channel
+        img = images[i]
+        ax.imshow(img)
+        ax.axis('off')
+    plt.tight_layout()
+    plt.show()
+
 def show_diff(ground_truth, predicted, cols=4, figsize=(20, 20)):
     rows = (len(ground_truth) + cols - 1) // cols
     fig, axs = plt.subplots(rows, cols, figsize=figsize)

@@ -7,14 +7,14 @@ from cleanfid import fid
 from torch.utils.data import DataLoader
 from dotenv import load_dotenv
 
-from utils import show_xyz, show_rgb, show_diff, adjust_dynamic_range
-from data import MelbourneXYZRGB
+from utils import show_xyz, show_rgb, show_z, show_diff, adjust_dynamic_range
+from data import MelbourneZRGB
 from model import GeneratorResNet
 
 load_dotenv()
 
-parser = argparse.ArgumentParser(description="cyclegan-resnet-implementation")
-parser.add_argument("--dataset_name", default="melbourne-top")
+parser = argparse.ArgumentParser(description="pix2pix-pytorch-implementation")
+parser.add_argument("--dataset_name", default="melbourne-z-top")
 parser.add_argument("--model_path", default="G_AB_8.pth")
 parser.add_argument("--threads", type=int, default=8, help="number of cpu threads to use during batch generation")
 parser.add_argument("--batch_size", type=int, default=2, help="size of the batches")
@@ -26,46 +26,36 @@ parser.add_argument("--channels", type=int, default=3, help="number of image cha
 parser.add_argument("--run_name", default="mild-fire-52", help="run name")
 opt = parser.parse_args()
 
-cuda = True if torch.cuda.is_available() else False
-
-input_shape = (opt.channels, opt.img_height, opt.img_width)
+device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 # load model
-model_path = opt.model_path
-model_g = GeneratorResNet(input_shape, input_shape, opt.n_residual_blocks)
+model_g = GeneratorResNet(1, 3).to(device)
+model_g.load_state_dict(torch.load(opt.model_path))
 
-if cuda:
-    model_g.cuda()
-model_g.load_state_dict(torch.load(model_path))
-
-test_set = MelbourneXYZRGB(dataset=opt.dataset_name, image_set="test")
+# load data
+test_set = MelbourneZRGB(dataset=opt.dataset_name, image_set="test")
 test_dl = DataLoader(dataset=test_set, num_workers=opt.threads, batch_size=opt.batch_size, shuffle=False)
 
-image_writing_path = "generated_images"
+# save data
+image_writing_path = "test_generated_images"
 if not os.path.exists(image_writing_path):
     os.makedirs(image_writing_path)
 
 for i, batch in enumerate(test_dl):
     # # Model inputs
-    xyz_input = batch["A"].cuda()
+    xyz_input = batch["A"].to(device)
     out_imgs = model_g(xyz_input)
     label = out_imgs.cpu().data
-    # label = adjust_dynamic_range(out_imgs.cpu().data, (-1.0, 1.0), (0.0, 1.0))
 
     # for img_num in range(opt.batch_size):
     #     print(f"Saving image number {i}_{img_num} out of {len(test_dl)}")
     #     np.save(f"{image_writing_path}/gen_imgs_{i}_{img_num}.npy", label.numpy().astype(np.float32)[img_num])  # typing: ignore
 
-    # get Visual Saliency-induced Index (VSI)
-    # vsi_score = vsi(label.type(Tensor), batch["B"].type(Tensor))
-    # print(vsi_score)
-
     # XYZ (only Z)
-    show_xyz(batch["A"].numpy(), cols=2)
+    # show_z(batch["A"].numpy(), cols=2)
     
     # ground truth RGB
     show_rgb(batch["B"].numpy(), cols=2)
-    print(label)
 
     # predicted RGB
     show_rgb(label.numpy(), cols=2)
