@@ -8,7 +8,6 @@ import sys
 
 from math import floor
 from pathlib import Path
-from shutil import rmtree
 from torchvision.utils import save_image, make_grid
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import LambdaLR
@@ -32,7 +31,7 @@ class Trainer():
         model_dir = "saved_models",
         image_dir = "saved_images",
         epochs: int = 10,
-        dataset_name: str = "melbourne-z-top",
+        dataset_name: str = "maps",
         image_size: int = 256,
         input_image_channel: int = 3,
         target_image_channel: int = 3,
@@ -175,6 +174,10 @@ class Trainer():
             self.train_set = MelbourneZRGB(dataset=self.dataset_name, image_set="train")
             self.sample_set = MelbourneZRGB(dataset=self.dataset_name, image_set="test", max_samples=self.sample_num)
             self.eval_set = MelbourneZRGB(dataset=self.dataset_name, image_set="test", max_samples=self.calculate_fid_num_images)
+        elif self.dataset_name == "maps":
+            self.train_set = Maps(image_set="train")
+            self.sample_set = Maps(image_set="test", max_samples=self.sample_num)
+            self.eval_set = Maps(image_set="test", max_samples=self.calculate_fid_num_images)
         else:
             raise ValueError(f"Unknown dataset: {self.dataset_name}")
 
@@ -320,7 +323,7 @@ class Trainer():
                 loss_real = self.criterion_GAN(self.D_A(real_A), valid_patch_A)  # real loss
                 fake_A_ = self.fake_A_buffer.push_and_pop(fake_A)
                 loss_fake = self.criterion_GAN(self.D_A(fake_A_.detach()), fake_patch_A)  # fake loss
-                loss_D_A = (loss_real + loss_fake) / 2  # total loss
+                loss_D_A = (loss_real + loss_fake) * 0.5  # total loss
 
                 # train discriminator B
                 loss_real = self.criterion_GAN(self.D_B(real_B), valid_patch_B)  # real loss

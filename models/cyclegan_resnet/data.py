@@ -145,7 +145,7 @@ class Maps(Dataset):
         super().__init__()
 
         assert dataset in ["maps"], "Dataset not supported for Maps"
-        assert image_set in ["train", "val"]
+        assert image_set in ["train", "test"]
 
         self.dataset = dataset
         self.base_dir = os.environ.get("DATASET_ROOT") or "."
@@ -158,6 +158,7 @@ class Maps(Dataset):
                 v2.ToDtype(torch.float32),
             ]
         )
+        self.resize = v2.Resize(256)
 
         dataset_path = os.path.join(self.base_dir, self.dataset)
         self.images_path = os.path.join(dataset_path, image_set)
@@ -173,5 +174,8 @@ class Maps(Dataset):
         # half left is input, half right is label
         input = img[:, :, : img.shape[2] // 2]
         label = img[:, :, img.shape[2] // 2 :]
+
+        input = self.resize(input)
+        label = self.resize(label)
 
         return {"A": input, "B": label}
