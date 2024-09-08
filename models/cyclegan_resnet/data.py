@@ -1,5 +1,4 @@
 import os
-from sympy import imageset
 import torch
 import numpy as np
 
@@ -106,6 +105,8 @@ class MelbourneZRGB(Dataset):
         self.image_set = image_set
         self.max_samples = max_samples
         self.transform = get_transform()
+        self.in_range = (0, 1)
+        self.out_range = (-1, 1)
 
         dataset_path = os.path.join(self.base_dir, self.dataset)
 
@@ -132,6 +133,9 @@ class MelbourneZRGB(Dataset):
             input = self.transform(input)
             label = self.transform(label)
 
+        input = adjust_dynamic_range(input, drange_in=self.in_range, drange_out=self.out_range)
+        label = adjust_dynamic_range(label, drange_in=self.in_range, drange_out=self.out_range)
+
         return {"A": input, "B": label}
 
 
@@ -151,6 +155,8 @@ class Maps(Dataset):
         self.base_dir = os.environ.get("DATASET_ROOT") or "."
         self.image_set = image_set
         self.max_samples = max_samples
+        self.in_range = (0, 1)
+        self.out_range = (-1, 1)
         self.transform = v2.Compose(
             [
                 v2.PILToTensor(),
@@ -177,5 +183,8 @@ class Maps(Dataset):
 
         input = self.resize(input)
         label = self.resize(label)
+
+        input = adjust_dynamic_range(input, drange_in=self.in_range, drange_out=self.out_range)
+        label = adjust_dynamic_range(label, drange_in=self.in_range, drange_out=self.out_range)
 
         return {"A": input, "B": label}

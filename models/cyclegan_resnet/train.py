@@ -19,41 +19,37 @@ from model import *
 from loss import *
 from data import *
 
-def cycle(iterable):
-    while True:
-        for i in iterable:
-            yield i
-
 class Trainer():
     def __init__(
         self,
         base_dir = ".",
         model_dir = "saved_models",
         image_dir = "saved_images",
-        epochs: int = 10,
+        epochs: int = 30,
         dataset_name: str = "melbourne-z-top",
         image_size: int = 256,
         input_image_channel: int = 3,
         target_image_channel: int = 3,
         generator_type: str = "unet256",
         batch_size: int = 1,
-        lr_gen = 5e-5,
-        lr_disc = 4e-4,
-        target_lr_gen = 1e-5,
-        target_lr_disc = 1e-4,
+        lr_gen = 2e-4,
+        lr_disc = 2e-4,
+        target_lr_gen = 1e-6,
+        target_lr_disc = 1e-6,
         lr_decay_span: int = 5,
         b1: float = 0.5,
         b2: float = 0.999,
         threads: int = 8,
-        sample_every: int = 500,
+        sample_every: int = 10,
         sample_num: int = 9,
+        sample_grid: bool = True,
         save_every: int = 2,
         loss_fns: list = ["gan", "cycle", "identity", "ssim"],
         loss_weights: list = [10.0, 10.0, 0.5, 2.0],
         calculate_fid_every: int = 2,
         calculate_fid_num_images: int = 1000,
         calculate_fid_batch_size: int = 8,
-        pool_size: int = 50,
+        pool_size: int = 40,
     ):
         self.name = str(datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
 
@@ -83,6 +79,8 @@ class Trainer():
 
         self.sample_every = sample_every
         self.sample_num = sample_num
+        self.sample_grid = sample_grid
+        
         self.save_every = save_every
 
         self.calculate_fid_every = calculate_fid_every
@@ -218,13 +216,10 @@ class Trainer():
                 raise ValueError(f"Unknown mode requested: {mode}")
 
     def print_networks(self):
-        print(self.G_AB)
-        print(self.G_BA)
-        print(self.D_A)
-        print(self.D_B)
+        for network in (self.G_AB, self.G_BA, self.D_A, self.D_B):
+            print(network)
 
     def update_learning_rate(self):
-        """Update learning rates for all the networks; called at the end of every epoch"""
         old_lr = self.optimizers[0].param_groups[0]['lr']
         for scheduler in self.schedulers:
                 scheduler.step()
@@ -234,22 +229,24 @@ class Trainer():
     def save_model(self, epoch):
         torch.save(self.G_AB.state_dict(), os.path.join(self.model_dir, f"G_AB_{epoch}.pth"))
     
-    def sample_images(self, epoch, sample_num):
-        self._toggle_all_networks("eval")
+    def sample_images(self, epoch, sample_num, grid=True):
+        self.G_AB.eval()
 
         fake_images = Tensor([]).to(self.device)
         for i, batch in enumerate(self.sample_dl):
             real_A = batch["A"].to(self.device)
-            fake_images = torch.cat((fake_images, self.G_AB(real_A)), 0)
+            fake_B = self.G_AB(real_A)
+            fake_B = adjust_dynamic_range(fake_B, drange_in=(-1, 1), drange_out=(0, 1))
+            if grid:
+                fake_images = torch.cat((fake_images, fake_B), 0)
+            else:
+                save_image(fake_B, os.path.join(self.image_dir, f"fake_B_{epoch}_{sample_num}_{i}.png"))  # save individual images
 
-            # save_image(fake_B, os.path.join(self.image_dir, f"fake_B_{epoch}_{sample_num}_{i}.png"))  # save individual images
+        if grid:
+            grid = make_grid(fake_images, nrow=3, normalize=True)
+            save_image(grid, os.path.join(self.image_dir, f"fake_B_{epoch}_{sample_num}.png"))
 
-        # make a grid of all the images
-        n_rows = 3
-        grid = make_grid(fake_images, nrow=n_rows, normalize=True)
-        save_image(grid, os.path.join(self.image_dir, f"fake_B_{epoch}_{sample_num}.png"))
-
-        self._toggle_all_networks("train")
+        self.G_AB.train()
     
     def calculate_fid(self, epoch):
         def eval_step(engine, batch):
@@ -295,12 +292,14 @@ class Trainer():
                 real_A = batch["A"].cuda()
                 real_B = batch["B"].cuda()
 
+                print(real_A.shape, real_B.shape)
+
                 self.optim_D.zero_grad()
                 self.optim_G.zero_grad()
 
                 # train generator
 
-                # Identity loss
+                # Identity loss (use only for 3>3)
                 # loss_id_A = self.criterion_identity(self.G_BA(real_A), real_A)
                 # loss_id_B = self.criterion_identity(self.G_AB(real_B), real_B)
                 # loss_identity = (loss_id_A + loss_id_B) * 0.5
@@ -361,7 +360,7 @@ class Trainer():
                 prev_time = time.time()
 
                 if self.sample_every and i % self.sample_every == 0:
-                    self.sample_images(epoch, i)
+                    self.sample_images(epoch, i, grid=self.sample_grid)
                 
                 if self.save_every and epoch % self.save_every == 0 and epoch != 0:
                     self.save_model(epoch)
