@@ -31,10 +31,11 @@ class Trainer():
         model_dir = "saved_models",
         image_dir = "saved_images",
         epochs: int = 10,
-        dataset_name: str = "maps",
+        dataset_name: str = "melbourne-z-top",
         image_size: int = 256,
         input_image_channel: int = 3,
         target_image_channel: int = 3,
+        generator_type: str = "unet256",
         batch_size: int = 1,
         lr_gen = 5e-5,
         lr_disc = 4e-4,
@@ -47,7 +48,6 @@ class Trainer():
         sample_every: int = 500,
         sample_num: int = 9,
         save_every: int = 2,
-        n_residual_blocks: int = 9,
         loss_fns: list = ["gan", "cycle", "identity", "ssim"],
         loss_weights: list = [10.0, 10.0, 0.5, 2.0],
         calculate_fid_every: int = 2,
@@ -76,7 +76,7 @@ class Trainer():
         self.b1 = b1
         self.b2 = b2
         self.threads = threads
-        self.n_residual_blocks = n_residual_blocks
+        self.generator_type = generator_type
         
         self.loss_fns = loss_fns
         self.loss_weights = loss_weights
@@ -108,18 +108,9 @@ class Trainer():
         return floor(self.epochs // self.save_every)
     
     def init_GAN(self):
-        # Initialize generator and discriminator
-        self.G_AB = GeneratorResNet(self.input_image_channel, self.target_image_channel, n_blocks=6).to(self.device)
-        self.G_BA = GeneratorResNet(self.target_image_channel, self.input_image_channel, n_blocks=6).to(self.device)
-        self.D_A = PatchDiscriminator(self.input_image_channel).to(self.device)
-        self.D_B = PatchDiscriminator(self.target_image_channel).to(self.device)
-
-        # self.print_networks()
-
-        init_weights(self.G_AB)
-        init_weights(self.G_BA)
-        init_weights(self.D_A)
-        init_weights(self.D_B)
+        # Models
+        self.init_generator()
+        self.init_discriminator()
 
         # Losses
         self.init_losses()
@@ -130,10 +121,32 @@ class Trainer():
         # Learning rate update schedulers
         self.init_schedulers()
 
-        # Buffers of previously generated samples
-        self.fake_A_buffer = ReplayBuffer(self.pool_size)
-        self.fake_B_buffer = ReplayBuffer(self.pool_size)
+        # Buffers
+        self.init_buffers()
 
+    def init_generator(self):
+        if self.generator_type == "resnet6":
+            self.G_AB = GeneratorResNet(self.input_image_channel, self.target_image_channel, n_blocks=6).to(self.device)
+            self.G_BA = GeneratorResNet(self.target_image_channel, self.input_image_channel, n_blocks=6).to(self.device)
+        elif self.generator_type == "resnet9":
+            self.G_AB = GeneratorResNet(self.input_image_channel, self.target_image_channel, n_blocks=9).to(self.device)
+            self.G_BA = GeneratorResNet(self.target_image_channel, self.input_image_channel, n_blocks=9).to(self.device)
+        elif self.generator_type == "unet256":
+            self.G_AB = GeneratorUNet(self.input_image_channel, self.target_image_channel, 8).to(self.device)
+            self.G_BA = GeneratorUNet(self.target_image_channel, self.input_image_channel, 8).to(self.device)
+        else:
+            raise ValueError(f"Unknown generator type: {self.generator_type}")
+
+        init_weights(self.G_AB)
+        init_weights(self.G_BA)
+
+    def init_discriminator(self):
+        self.D_A = PatchDiscriminator(self.input_image_channel).to(self.device)
+        self.D_B = PatchDiscriminator(self.target_image_channel).to(self.device)
+
+        init_weights(self.D_A)
+        init_weights(self.D_B)
+    
     def init_folders(self):
         os.makedirs(self.model_dir, exist_ok=True)
         os.makedirs(self.image_dir, exist_ok=True)
@@ -164,6 +177,11 @@ class Trainer():
         self.lambda_identity = self.loss_weights[self.loss_fns.index("identity")]
         self.lambda_ssim = self.loss_weights[self.loss_fns.index("ssim")]
         # self.lambda_tv = self.loss_weights[self.loss_fns.index("tv")]
+
+    def init_buffers(self):
+        # buffers of previously generated samples
+        self.fake_A_buffer = ReplayBuffer(self.pool_size)
+        self.fake_B_buffer = ReplayBuffer(self.pool_size)
 
     def set_data_src(self):
         if self.dataset_name == "melbourne-top":
