@@ -88,8 +88,9 @@ ENV/
 # Rope project settings
 .ropeproject
 
+.aim/
 dataset/
-wandb/
 saved_models/
+saved_images
 models_vault/
-exec_time.py
+fid/

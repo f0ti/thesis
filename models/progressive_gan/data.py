@@ -3,8 +3,8 @@
 from typing import Any, Optional, Tuple
 
 import os
+from requests import get
 import torch
-import argparse
 import numpy as np
 
 from torch.utils.data import DataLoader, Dataset
@@ -46,35 +46,6 @@ def get_transform(
     )
 
 
-def get_data_loader(
-    dataset: Dataset, batch_size: int, num_workers: int = 8
-) -> DataLoader:
-    """
-    generate the data_loader from the given dataset
-    Args:
-        dataset: Torch dataset object
-        batch_size: batch size for training
-        num_workers: num of parallel readers for reading the data
-    Returns: dataloader for the dataset
-    """
-    return DataLoader(
-        dataset,
-        batch_size=batch_size,
-        shuffle=True,
-        num_workers=num_workers,
-        drop_last=True,
-    )
-
-
-def get_dataset(dataset_name: str) -> Dataset:
-    if dataset_name == "melbourne-top":
-        return MelbourneXYZRGB(dataset=dataset_name, image_set="test")
-    elif dataset_name == "melbourne-z-top":
-        return MelbourneZRGB(dataset=dataset_name, image_set="test")
-    else:
-        raise ValueError(f"Unknown dataset: {dataset_name}")
-
-
 class MelbourneXYZRGB(Dataset):
     """
     The tile dataset that contains the XYZ and RGB data
@@ -83,9 +54,8 @@ class MelbourneXYZRGB(Dataset):
         self,
         dataset: str = "melbourne-top",
         image_set: str = "train",
-        transform=get_transform(),
-        input_data_range: Tuple[float, float] = (0.0, 1.0),
-        output_data_range: Tuple[float, float] = (-1.0, 1.0),
+        in_range: Tuple[float, float] = (0.0, 1.0),
+        out_range: Tuple[float, float] = (-1.0, 1.0),
         max_samples: Optional[int] = None,
     ):
         super().__init__()
@@ -97,9 +67,9 @@ class MelbourneXYZRGB(Dataset):
         self.base_dir = os.environ.get("DATASET_ROOT") or "."
         self.image_set = image_set
         self.max_samples = max_samples
-        self.transform = transform
-        self.input_data_range = input_data_range
-        self.output_data_range = output_data_range
+        self.transform = get_transform()
+        self.in_range = in_range
+        self.out_range = out_range
 
         dataset_path = os.path.join(self.base_dir, self.dataset)
 
@@ -126,13 +96,8 @@ class MelbourneXYZRGB(Dataset):
             input = self.transform(input)
             label = self.transform(label)
 
-        input = adjust_dynamic_range(
-            input, drange_in=self.input_data_range, drange_out=self.output_data_range
-        )
-
-        label = adjust_dynamic_range(
-            label, drange_in=self.input_data_range, drange_out=self.output_data_range
-        )
+        input = adjust_dynamic_range(input, drange_in=self.in_range, drange_out=self.out_range)
+        label = adjust_dynamic_range(label, drange_in=self.in_range, drange_out=self.out_range)
 
         return {"A": input, "B": label}
 
@@ -145,9 +110,8 @@ class MelbourneZRGB(Dataset):
         self,
         dataset: str = "melbourne-z-top",
         image_set: str = "train",
-        transform=get_transform(),
-        input_data_range: Tuple[float, float] = (0.0, 1.0),
-        output_data_range: Tuple[float, float] = (-1.0, 1.0),
+        in_range: Tuple[float, float] = (0.0, 1.0),
+        out_range: Tuple[float, float] = (-1.0, 1.0),
         max_samples: Optional[int] = None,
     ):
         super().__init__()
@@ -159,9 +123,9 @@ class MelbourneZRGB(Dataset):
         self.base_dir = os.environ.get("DATASET_ROOT") or "."
         self.image_set = image_set
         self.max_samples = max_samples
-        self.transform = transform
-        self.input_data_range = input_data_range
-        self.output_data_range = output_data_range
+        self.transform = get_transform()
+        self.in_range = in_range
+        self.out_range= out_range
 
         dataset_path = os.path.join(self.base_dir, self.dataset)
 
@@ -187,13 +151,14 @@ class MelbourneZRGB(Dataset):
         if self.transform is not None:
             input = self.transform(input)
             label = self.transform(label)
-
-        input = adjust_dynamic_range(
-            input, drange_in=self.input_data_range, drange_out=self.output_data_range
-        )
-
-        label = adjust_dynamic_range(
-            label, drange_in=self.input_data_range, drange_out=self.output_data_range
-        )
+        
+        input = adjust_dynamic_range(input, drange_in=self.in_range, drange_out=self.out_range)
+        label = adjust_dynamic_range(label, drange_in=self.in_range, drange_out=self.out_range)
 
         return {"A": input, "B": label}
+
+
+class Maps(Dataset):
+    def __init__(self) -> None:
+        super().__init__()
+        pass

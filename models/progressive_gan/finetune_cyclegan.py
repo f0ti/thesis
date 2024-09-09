@@ -7,7 +7,7 @@ import torch
 from torch.backends import cudnn
 
 from data import MelbourneXYZRGB, get_transform
-from gan import CycleGAN
+from models.progressive_gan.cyclegan import CycleGAN
 from losses import CycleGANLoss
 from networks import Discriminator, Generator
 from utils import str2bool, str2GANLoss
@@ -82,7 +82,6 @@ def parse_arguments() -> argparse.Namespace:
     return parsed_args
 
 
-
 def finetune_cyclegan(args: argparse.Namespace) -> None:
     """
     method to train the cyclegan given the configuration parameters
@@ -92,22 +91,11 @@ def finetune_cyclegan(args: argparse.Namespace) -> None:
     """
     print(f"Selected arguments: {args}")
 
-    generator_AB = Generator(
-        depth=args.depth,
+    generator_AB = Generator(depth=args.depth)
+    generator_BA = Generator(depth=args.depth)
 
-    )
-
-    generator_BA = Generator(
-        depth=args.depth,
-    )
-
-    discriminator_A = Discriminator(
-        depth=args.depth,
-    )
-
-    discriminator_B = Discriminator(
-        depth=args.depth,
-    )
+    discriminator_A = Discriminator(depth=args.depth)
+    discriminator_B = Discriminator(depth=args.depth)
 
     cyclegan = CycleGAN(
         generator_AB,
@@ -122,9 +110,6 @@ def finetune_cyclegan(args: argparse.Namespace) -> None:
     cyclegan.train(
         dataset=MelbourneXYZRGB(
             image_set="train",
-            transform=get_transform(
-                new_size=(int(2**args.depth), int(2**args.depth)),
-            ),
         ),
         epochs=args.epochs,
         batch_sizes=args.batch_sizes,

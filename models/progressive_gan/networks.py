@@ -48,7 +48,7 @@ class Generator(th.nn.Module):
     Generator Module (block) of the GAN network
     Args:
         depth: required depth of the Network (**starts from 2)
-        num_channels: number of output channels (default = 3 for RGB)
+        output_channels: number of output channels (default = 3 for RGB)
         latent_size: size of the latent manifold
         use_eql: whether to use equalized learning rate
     """
@@ -64,8 +64,8 @@ class Generator(th.nn.Module):
     def __init__(
         self,
         depth: int = 8,
-        input_channels: int = 3,
-        num_channels: int = 3,
+        input_channels: int = 1,
+        output_channels: int = 3,
         use_eql: bool = True,
     ) -> None:
         super().__init__()
@@ -73,7 +73,7 @@ class Generator(th.nn.Module):
         # object state:
         self.depth = depth
         self.input_channels = input_channels
-        self.num_channels = num_channels
+        self.output_channels = output_channels
         self.use_eql = use_eql
 
         ConvBlock = EqualizedConv2d if use_eql else Conv2d
@@ -91,7 +91,7 @@ class Generator(th.nn.Module):
         # convert any feature map to RGB image
         self.rgb_converters = ModuleList(
             [
-                ConvBlock(nf(stage), num_channels, kernel_size=(1, 1))
+                ConvBlock(nf(stage), output_channels, kernel_size=(1, 1))
                 for stage in range(1, depth)
             ]
         )
@@ -142,7 +142,7 @@ class Discriminator(th.nn.Module):
     Discriminator of the GAN
     Args:
         depth: depth of the discriminator. log_2(resolution)
-        num_channels: number of channels of the input images (Default = 3 for RGB)
+        input_channels: number of channels of the input images (Default = 3 for RGB)
         latent_size: latent size of the final layer
         use_eql: whether to use the equalized learning rate
         num_classes: number of classes for a conditional discriminator (Default = None)
@@ -152,14 +152,14 @@ class Discriminator(th.nn.Module):
     def __init__(
         self,
         depth: int = 8,
-        num_channels: int = 3,
+        input_channels: int = 3,
         latent_size: int = 256,
         use_eql: bool = True,
         num_classes: Optional[int] = None,
     ) -> None:
         super().__init__()
         self.depth = depth
-        self.num_channels = num_channels
+        self.num_channels = input_channels
         self.latent_size = latent_size
         self.use_eql = use_eql
         self.num_classes = num_classes
@@ -177,7 +177,7 @@ class Discriminator(th.nn.Module):
             reversed(
                 [
                     Sequential(
-                        ConvBlock(num_channels, nf(stage), kernel_size=(1, 1)),
+                        ConvBlock(input_channels, nf(stage), kernel_size=(1, 1)),
                         LeakyReLU(0.2),
                     )
                     for stage in range(1, depth)
@@ -216,7 +216,6 @@ class Discriminator(th.nn.Module):
             y = self.from_rgb[-1](x)
 
         y = self.layers[-1](y)
-        print(y)
         return y
 
     def get_save_info(self) -> Dict[str, Any]:
