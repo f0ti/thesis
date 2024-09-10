@@ -104,7 +104,7 @@ class UnetSkipConnectionBlock(nn.Module):
     def __init__(self, outer_nc, inner_nc, input_nc=None,
                  submodule=None, outermost=False, innermost=False, norm_layer=nn.BatchNorm2d, use_dropout=False):
         super(UnetSkipConnectionBlock, self).__init__()
-        
+
         self.outermost = outermost
         use_bias = norm_layer == nn.InstanceNorm2d
         if input_nc is None:
@@ -115,27 +115,34 @@ class UnetSkipConnectionBlock(nn.Module):
         downnorm = norm_layer(inner_nc)
         uprelu = nn.ReLU(True)
         upnorm = norm_layer(outer_nc)
+
         model = []
         if outermost:
-            upconv = nn.ConvTranspose2d(inner_nc * 2, outer_nc,
-                                        kernel_size=4, stride=2,
-                                        padding=1)
+            # Replace ConvTranspose2d with Upsample + ReflectionPad2d + Conv2d
+            upsample = nn.Upsample(scale_factor=2, mode='bilinear')
+            uppad = nn.ReflectionPad2d(1)
+            upconv = nn.Conv2d(inner_nc * 2, outer_nc,
+                               kernel_size=3, stride=1, padding=0)
             down = [downconv]
-            up = [uprelu, upconv, nn.Tanh()]
+            up = [uprelu, upsample, uppad, upconv, nn.Tanh()]
             model = down + [submodule] + up
         elif innermost:
-            upconv = nn.ConvTranspose2d(inner_nc, outer_nc,
-                                        kernel_size=4, stride=2,
-                                        padding=1, bias=use_bias)
+            # Replace ConvTranspose2d with Upsample + ReflectionPad2d + Conv2d
+            upsample = nn.Upsample(scale_factor=2, mode='bilinear')
+            uppad = nn.ReflectionPad2d(1)
+            upconv = nn.Conv2d(inner_nc, outer_nc,
+                               kernel_size=3, stride=1, padding=0, bias=use_bias)
             down = [downrelu, downconv]
-            up = [uprelu, upconv, upnorm]
+            up = [uprelu, upsample, uppad, upconv, upnorm]
             model = down + up
         else:
-            upconv = nn.ConvTranspose2d(inner_nc * 2, outer_nc,
-                                        kernel_size=4, stride=2,
-                                        padding=1, bias=use_bias)
+            # Replace ConvTranspose2d with Upsample + ReflectionPad2d + Conv2d
+            upsample = nn.Upsample(scale_factor=2, mode='bilinear')
+            uppad = nn.ReflectionPad2d(1)
+            upconv = nn.Conv2d(inner_nc * 2, outer_nc,
+                               kernel_size=3, stride=1, padding=0, bias=use_bias)
             down = [downrelu, downconv, downnorm]
-            up = [uprelu, upconv, upnorm]
+            up = [uprelu, upsample, uppad, upconv, upnorm]
             model = down + [submodule] + up
             if use_dropout:
                 model += [nn.Dropout(0.5)]

@@ -28,24 +28,25 @@ class Trainer():
         epochs: int = 30,
         dataset_name: str = "melbourne-z-top",
         image_size: int = 256,
-        input_image_channel: int = 3,
+        input_image_channel: int = 1,
         target_image_channel: int = 3,
-        generator_type: str = "unet256",
+        adjust_dynamic_range: bool = False,
+        generator_type: str = "unet",
         batch_size: int = 1,
         lr_gen = 2e-4,
         lr_disc = 2e-4,
-        target_lr_gen = 1e-6,
-        target_lr_disc = 1e-6,
+        target_lr_gen = 1e-4,
+        target_lr_disc = 1e-4,
         lr_decay_span: int = 5,
         b1: float = 0.5,
         b2: float = 0.999,
         threads: int = 8,
-        sample_every: int = 10,
+        sample_every: int = 500,
         sample_num: int = 9,
         sample_grid: bool = True,
         save_every: int = 2,
-        loss_fns: list = ["gan", "cycle", "identity", "ssim"],
-        loss_weights: list = [10.0, 10.0, 0.5, 2.0],
+        loss_fns: list = ["gan", "cycle", "identity", "ssim", "tv"],
+        loss_weights: list = [10.0, 10.0, 0.5, 5.0, 2.0],
         calculate_fid_every: int = 2,
         calculate_fid_num_images: int = 1000,
         calculate_fid_batch_size: int = 8,
@@ -73,6 +74,7 @@ class Trainer():
         self.b2 = b2
         self.threads = threads
         self.generator_type = generator_type
+        self.pool_size = pool_size
         
         self.loss_fns = loss_fns
         self.loss_weights = loss_weights
@@ -91,12 +93,7 @@ class Trainer():
         self.image_size = image_size
         self.input_image_channel = input_image_channel
         self.target_image_channel = target_image_channel
-        if dataset_name == "melbourne-z-top":
-            self.input_image_channel = 1
-        self.input_shape = (self.input_image_channel, self.image_size, self.image_size)
-        self.target_shape = (self.target_image_channel, self.image_size, self.image_size)
-
-        self.pool_size = pool_size
+        self.adjust_dynamic_range = adjust_dynamic_range
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.logger = aim.Run()
@@ -129,7 +126,7 @@ class Trainer():
         elif self.generator_type == "resnet9":
             self.G_AB = GeneratorResNet(self.input_image_channel, self.target_image_channel, n_blocks=9).to(self.device)
             self.G_BA = GeneratorResNet(self.target_image_channel, self.input_image_channel, n_blocks=9).to(self.device)
-        elif self.generator_type == "unet256":
+        elif self.generator_type == "unet":
             self.G_AB = GeneratorUNet(self.input_image_channel, self.target_image_channel, 8).to(self.device)
             self.G_BA = GeneratorUNet(self.target_image_channel, self.input_image_channel, 8).to(self.device)
         else:
@@ -169,12 +166,12 @@ class Trainer():
         self.criterion_cycle = torch.nn.L1Loss()
         self.criterion_identity = torch.nn.L1Loss()
         self.criterion_ssim = SSIMLoss().to(self.device)
-        # self.criterion_tv = TVLoss()
+        self.criterion_tv = TVLoss().to(self.device)
         self.lambda_GAN = self.loss_weights[self.loss_fns.index("gan")]
         self.lambda_cycle = self.loss_weights[self.loss_fns.index("cycle")]
         self.lambda_identity = self.loss_weights[self.loss_fns.index("identity")]
         self.lambda_ssim = self.loss_weights[self.loss_fns.index("ssim")]
-        # self.lambda_tv = self.loss_weights[self.loss_fns.index("tv")]
+        self.lambda_tv = self.loss_weights[self.loss_fns.index("tv")]
 
     def init_buffers(self):
         # buffers of previously generated samples
@@ -236,7 +233,8 @@ class Trainer():
         for i, batch in enumerate(self.sample_dl):
             real_A = batch["A"].to(self.device)
             fake_B = self.G_AB(real_A)
-            fake_B = adjust_dynamic_range(fake_B, drange_in=(-1, 1), drange_out=(0, 1))
+            if self.adjust_dynamic_range:
+                fake_B = adjust_dynamic_range(fake_B, drange_in=(-1, 1), drange_out=(0, 1))
             if grid:
                 fake_images = torch.cat((fake_images, fake_B), 0)
             else:
@@ -286,13 +284,10 @@ class Trainer():
         valid_patch_B = torch.ones((self.batch_size, *self.D_B.output_shape), requires_grad=False).cuda()
         fake_patch_B = torch.zeros((self.batch_size, *self.D_B.output_shape), requires_grad=False).cuda()
         
-        prev_time = time.time()
         for epoch in range(self.epochs):
             for i, batch in enumerate(self.dataloader):
                 real_A = batch["A"].cuda()
                 real_B = batch["B"].cuda()
-
-                print(real_A.shape, real_B.shape)
 
                 self.optim_D.zero_grad()
                 self.optim_G.zero_grad()
@@ -319,7 +314,7 @@ class Trainer():
                 loss_cycle = (loss_cycle_A + loss_cycle_B) * 0.5
 
                 # Total Variation loss
-                # loss_tv = criterion_tv(fake_A)  # do it only for A>B
+                loss_tv = self.criterion_tv(fake_A)  # do it only for A>B
 
                 # Structural Similarity loss
                 loss_ssim_G_A = self.criterion_ssim(fake_A, real_A)
@@ -331,7 +326,7 @@ class Trainer():
                 loss_G += self.lambda_cycle * loss_cycle
                 loss_G += self.lambda_ssim * loss_ssim
                 # loss_G += self.lambda_identity * loss_identity
-                # loss_G += loss_tv * opt.lambda_tv
+                loss_G += loss_tv * self.lambda_tv
                 
                 loss_G.backward()
                 self.optim_G.step()
@@ -354,10 +349,10 @@ class Trainer():
                 self.optim_D.step()
 
                 # Determine approximate time left
-                batches_done = epoch * len(self.dataloader) + i
-                batches_left = self.epochs * len(self.dataloader) - batches_done
-                time_left = datetime.timedelta(seconds=batches_left * (time.time() - prev_time))
-                prev_time = time.time()
+                # batches_done = epoch * len(self.dataloader) + i
+                # batches_left = self.epochs * len(self.dataloader) - batches_done
+                # time_left = datetime.timedelta(seconds=batches_left * (time.time() - prev_time))
+                # prev_time = time.time()
 
                 if self.sample_every and i % self.sample_every == 0:
                     self.sample_images(epoch, i, grid=self.sample_grid)
@@ -370,9 +365,9 @@ class Trainer():
                 self.logger.track(loss_adv_G.item(), "loss_adv_G")
                 self.logger.track(loss_cycle.item(), "loss_cycle")
                 # self.logger.track(loss_identity.item(), "loss_identity")
-                # self.logger.track(loss_tv.item(), "loss_tv")
+                self.logger.track(loss_tv.item(), "loss_tv")
                 sys.stdout.write(
-                    "\r[Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f, adv: %f, cycle: %f, ssim: %f] ETA: %s"
+                    "\r [Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f, adv: %f, cycle: %f, ssim: %f, tv: %f]"
                     % (
                         epoch,
                         self.epochs,
@@ -383,7 +378,7 @@ class Trainer():
                         loss_adv_G.item(),
                         loss_cycle.item(),
                         loss_ssim.item(),
-                        time_left,
+                        loss_tv.item()
                     )
                 )
             

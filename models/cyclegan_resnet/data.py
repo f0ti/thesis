@@ -94,6 +94,7 @@ class MelbourneZRGB(Dataset):
         dataset: str = "melbourne-z-top",
         image_set: str = "train",
         max_samples: Optional[int] = None,
+        adjust_dynamic_range: bool = False,
     ):
         super().__init__()
 
@@ -105,8 +106,7 @@ class MelbourneZRGB(Dataset):
         self.image_set = image_set
         self.max_samples = max_samples
         self.transform = get_transform()
-        self.in_range = (0, 1)
-        self.out_range = (-1, 1)
+        self.adjust_dynamic_range = adjust_dynamic_range
 
         dataset_path = os.path.join(self.base_dir, self.dataset)
 
@@ -133,8 +133,9 @@ class MelbourneZRGB(Dataset):
             input = self.transform(input)
             label = self.transform(label)
 
-        input = adjust_dynamic_range(input, drange_in=self.in_range, drange_out=self.out_range)
-        label = adjust_dynamic_range(label, drange_in=self.in_range, drange_out=self.out_range)
+        if self.adjust_dynamic_range:
+            input = adjust_dynamic_range(input, (0, 1), (-1, 1))
+            label = adjust_dynamic_range(label, (0, 1), (-1, 1))
 
         return {"A": input, "B": label}
 
@@ -145,6 +146,7 @@ class Maps(Dataset):
         dataset: str = "maps",
         image_set: str = "train",
         max_samples: Optional[int] = None,
+        adjust_dynamic_range: bool = False,
     ):
         super().__init__()
 
@@ -155,8 +157,6 @@ class Maps(Dataset):
         self.base_dir = os.environ.get("DATASET_ROOT") or "."
         self.image_set = image_set
         self.max_samples = max_samples
-        self.in_range = (0, 1)
-        self.out_range = (-1, 1)
         self.transform = v2.Compose(
             [
                 v2.PILToTensor(),
@@ -169,6 +169,7 @@ class Maps(Dataset):
         dataset_path = os.path.join(self.base_dir, self.dataset)
         self.images_path = os.path.join(dataset_path, image_set)
         self.image_samples = sorted(os.listdir(self.images_path))[:max_samples]
+        self.adjust_dynamic_range = adjust_dynamic_range
 
     def __len__(self) -> int:
         return len(self.image_samples)
@@ -184,7 +185,8 @@ class Maps(Dataset):
         input = self.resize(input)
         label = self.resize(label)
 
-        input = adjust_dynamic_range(input, drange_in=self.in_range, drange_out=self.out_range)
-        label = adjust_dynamic_range(label, drange_in=self.in_range, drange_out=self.out_range)
+        if self.adjust_dynamic_range:
+            input = adjust_dynamic_range(input, (0, 1), (-1, 1))
+            label = adjust_dynamic_range(label, (0, 1), (-1, 1))
 
         return {"A": input, "B": label}
