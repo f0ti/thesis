@@ -1,7 +1,6 @@
 import os
 import itertools
 import datetime
-import time
 import torch
 import aim
 import sys
@@ -10,7 +9,6 @@ from math import floor
 from pathlib import Path
 from torchvision.utils import save_image, make_grid
 from torch.utils.data import DataLoader
-from torch.optim.lr_scheduler import LambdaLR
 from ignite.engine import Engine
 from ignite.metrics import FID, InceptionScore
 
@@ -25,19 +23,18 @@ class Trainer():
         base_dir = ".",
         model_dir = "saved_models",
         image_dir = "saved_images",
-        epochs: int = 30,
+        epochs: int = 10,
+        epochs_decay: int = 10,
         dataset_name: str = "melbourne-z-top",
         image_size: int = 256,
         input_image_channel: int = 1,
         target_image_channel: int = 3,
         adjust_dynamic_range: bool = False,
-        generator_type: str = "unet",
+        generator_type: str = "unet_upsample",
         batch_size: int = 1,
         lr_gen = 2e-4,
         lr_disc = 2e-4,
-        target_lr_gen = 1e-4,
-        target_lr_disc = 1e-4,
-        lr_decay_span: int = 5,
+        lr_policy: str = "linear",
         b1: float = 0.5,
         b2: float = 0.999,
         threads: int = 8,
@@ -47,29 +44,28 @@ class Trainer():
         save_every: int = 2,
         loss_fns: list = ["gan", "cycle", "identity", "ssim", "tv"],
         loss_weights: list = [10.0, 10.0, 0.5, 5.0, 2.0],
-        calculate_fid_every: int = 2,
-        calculate_fid_num_images: int = 1000,
-        calculate_fid_batch_size: int = 8,
-        pool_size: int = 40,
+        eval_fid: bool = True,
+        eval_is: bool = False,
+        calculate_eval_every: int = 2,
+        calculate_eval_samples: int = 1000,
+        calculate_eval_batch_size: int = 8,
+        pool_size: int = 50,
     ):
         self.name = str(datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
 
         base_dir = Path(base_dir)
         self.model_dir = base_dir / model_dir / self.name
         self.image_dir = base_dir / image_dir / self.name
-        self.fid_dir = base_dir / 'fid' / self.name
+        self.eval_dir = base_dir / 'eval' / self.name
         self.init_folders()
         
         self.epochs = epochs
         self.dataset_name = dataset_name
         self.batch_size = batch_size
-        self.optimizers = []
-        self.schedulers = []
+        self.lr_policy = lr_policy
         self.lr_gen = lr_gen
         self.lr_disc = lr_disc
-        self.target_lr_gen = target_lr_gen
-        self.target_lr_disc = target_lr_disc
-        self.lr_decay_span = lr_decay_span
+        self.epochs_decay = epochs_decay
         self.b1 = b1
         self.b2 = b2
         self.threads = threads
@@ -85,10 +81,12 @@ class Trainer():
         
         self.save_every = save_every
 
-        self.calculate_fid_every = calculate_fid_every
-        self.calculate_fid_num_images = calculate_fid_num_images
-        self.calculate_fid_batch_size = calculate_fid_batch_size
-        self.fid = 0
+        self.calculate_eval_every = calculate_eval_every
+        self.calculate_eval_samples = calculate_eval_samples
+        self.calculate_eval_batch_size = calculate_eval_batch_size
+        self.eval_fid = eval_fid
+        self.eval_is = eval_is
+        assert (self.eval_fid or self.eval_is), "At least one of FID or IS should be enabled"
 
         self.image_size = image_size
         self.input_image_channel = input_image_channel
@@ -126,9 +124,12 @@ class Trainer():
         elif self.generator_type == "resnet9":
             self.G_AB = GeneratorResNet(self.input_image_channel, self.target_image_channel, n_blocks=9).to(self.device)
             self.G_BA = GeneratorResNet(self.target_image_channel, self.input_image_channel, n_blocks=9).to(self.device)
-        elif self.generator_type == "unet":
-            self.G_AB = GeneratorUNet(self.input_image_channel, self.target_image_channel, 8).to(self.device)
-            self.G_BA = GeneratorUNet(self.target_image_channel, self.input_image_channel, 8).to(self.device)
+        elif self.generator_type == "unet_upconv":
+            self.G_AB = GeneratorUNet(self.input_image_channel, self.target_image_channel, 8, upsample=False).to(self.device)
+            self.G_BA = GeneratorUNet(self.target_image_channel, self.input_image_channel, 8, upsample=False).to(self.device)
+        elif self.generator_type == "unet_upsample":
+            self.G_AB = GeneratorUNet(self.input_image_channel, self.target_image_channel, 8, upsample=True).to(self.device)
+            self.G_BA = GeneratorUNet(self.target_image_channel, self.input_image_channel, 8, upsample=True).to(self.device)
         else:
             raise ValueError(f"Unknown generator type: {self.generator_type}")
 
@@ -145,33 +146,27 @@ class Trainer():
     def init_folders(self):
         os.makedirs(self.model_dir, exist_ok=True)
         os.makedirs(self.image_dir, exist_ok=True)
-        os.makedirs(self.fid_dir, exist_ok=True)
+        os.makedirs(self.eval_dir, exist_ok=True)
 
     def init_optimizers(self):
         self.optim_G = torch.optim.Adam(itertools.chain(self.G_AB.parameters(), self.G_BA.parameters()), lr=self.lr_disc, betas=(self.b1, self.b2))
         self.optim_D = torch.optim.Adam(itertools.chain(self.D_A.parameters(), self.D_B.parameters()), lr=self.lr_gen, betas=(self.b1, self.b2))
-        self.optimizers.append(self.optim_G)
-        self.optimizers.append(self.optim_D)
+        self.optimizers = [self.optim_G, self.optim_D]
 
     def init_schedulers(self):
-        D_decay_fn = lambda i: max(1 - i / self.lr_decay_span, 0) + (self.target_lr_disc / self.lr_disc) * min(i / self.lr_decay_span, 1)
-        G_decay_fn = lambda i: max(1 - i / self.lr_decay_span, 0) + (self.target_lr_gen / self.lr_gen) * min(i / self.lr_decay_span, 1)
-        self.lr_sched_D = LambdaLR(self.optim_D, D_decay_fn)
-        self.lr_sched_G = LambdaLR(self.optim_G, G_decay_fn)
-        self.schedulers.append(self.lr_sched_D)
-        self.schedulers.append(self.lr_sched_G)
+        self.schedulers = [get_scheduler(optimizer, self.epochs, self.epochs_decay) for optimizer in self.optimizers]
 
     def init_losses(self):
         self.criterion_GAN = torch.nn.MSELoss()
         self.criterion_cycle = torch.nn.L1Loss()
         self.criterion_identity = torch.nn.L1Loss()
         self.criterion_ssim = SSIMLoss().to(self.device)
-        self.criterion_tv = TVLoss().to(self.device)
+        # self.criterion_tv = TVLoss().to(self.device)
         self.lambda_GAN = self.loss_weights[self.loss_fns.index("gan")]
         self.lambda_cycle = self.loss_weights[self.loss_fns.index("cycle")]
         self.lambda_identity = self.loss_weights[self.loss_fns.index("identity")]
         self.lambda_ssim = self.loss_weights[self.loss_fns.index("ssim")]
-        self.lambda_tv = self.loss_weights[self.loss_fns.index("tv")]
+        # self.lambda_tv = self.loss_weights[self.loss_fns.index("tv")]
 
     def init_buffers(self):
         # buffers of previously generated samples
@@ -182,28 +177,32 @@ class Trainer():
         if self.dataset_name == "melbourne-top":
             self.train_set = MelbourneXYZRGB(dataset=self.dataset_name, image_set="train")
             self.sample_set = MelbourneXYZRGB(dataset=self.dataset_name, image_set="test", max_samples=self.sample_num)
-            self.eval_set = MelbourneXYZRGB(dataset=self.dataset_name, image_set="test", max_samples=self.calculate_fid_num_images)
+            self.eval_set = MelbourneXYZRGB(dataset=self.dataset_name, image_set="test", max_samples=self.calculate_eval_samples)
         elif self.dataset_name == "melbourne-z-top":
             self.train_set = MelbourneZRGB(dataset=self.dataset_name, image_set="train")
             self.sample_set = MelbourneZRGB(dataset=self.dataset_name, image_set="test", max_samples=self.sample_num)
-            self.eval_set = MelbourneZRGB(dataset=self.dataset_name, image_set="test", max_samples=self.calculate_fid_num_images)
+            self.eval_set = MelbourneZRGB(dataset=self.dataset_name, image_set="test", max_samples=self.calculate_eval_samples)
         elif self.dataset_name == "maps":
             self.train_set = Maps(image_set="train")
             self.sample_set = Maps(image_set="test", max_samples=self.sample_num)
-            self.eval_set = Maps(image_set="test", max_samples=self.calculate_fid_num_images)
+            self.eval_set = Maps(image_set="test", max_samples=self.calculate_eval_samples)
         else:
             raise ValueError(f"Unknown dataset: {self.dataset_name}")
 
         self.dataloader = DataLoader(dataset=self.train_set, num_workers=self.threads, batch_size=self.batch_size, shuffle=True)
         self.sample_dl = DataLoader(dataset=self.sample_set, num_workers=self.threads, batch_size=self.sample_num, shuffle=False)
-        self.eval_dl = DataLoader(dataset=self.sample_set, num_workers=self.threads, batch_size=self.calculate_fid_batch_size, shuffle=False)
+        self.eval_dl = DataLoader(dataset=self.sample_set, num_workers=self.threads, batch_size=self.calculate_eval_batch_size, shuffle=False)
+
+    def save_configs(self):
+        with open(self.model_dir / "configs.txt", "w") as f:
+            f.write(str(self.__dict__))
 
     def track(self, value, name):
         if self.logger is None:
             return
         self.logger.track(value, name = name)
 
-    def _toggle_all_networks(self, mode="train"):
+    def _toggle_networks(self, mode="train"):
         for network in (self.G_AB, self.G_BA, self.D_A, self.D_B):
             if mode.lower() == "train":
                 network.train()
@@ -217,11 +216,12 @@ class Trainer():
             print(network)
 
     def update_learning_rate(self):
+        """Update learning rates for all the networks; called at the end of every epoch"""
         old_lr = self.optimizers[0].param_groups[0]['lr']
         for scheduler in self.schedulers:
                 scheduler.step()
         lr = self.optimizers[0].param_groups[0]['lr']
-        print('learning rate %.4f -> %.4f' % (old_lr, lr))
+        print('learning rate %.7f -> %.7f' % (old_lr, lr))
 
     def save_model(self, epoch):
         torch.save(self.G_AB.state_dict(), os.path.join(self.model_dir, f"G_AB_{epoch}.pth"))
@@ -251,9 +251,13 @@ class Trainer():
             return batch
 
         default_evaluator = Engine(eval_step)
-        fid_metric = FID()
-        fid_metric.attach(default_evaluator, "fid")
-        
+        if self.eval_is:
+            is_metric = InceptionScore()
+            is_metric.attach(default_evaluator, "is")
+        if self.eval_fid:        
+            fid_metric = FID()
+            fid_metric.attach(default_evaluator, "fid")
+
         # get evaluation samples
         with torch.no_grad():
             self.G_AB.eval()
@@ -265,18 +269,20 @@ class Trainer():
             state = default_evaluator.run([[fake, real]])
             self.G_AB.train()
         
-        self.fid = state.metrics["fid"]
+        self.fid = state.metrics["fid"] if self.eval_fid else 0.0
+        self.is_score = state.metrics["is"] if self.eval_is else 0.0
 
         # write to file
-        with open(self.fid_dir / f"fid.txt", "a") as f:
-            f.write(f"{epoch},{self.fid}\n")
+        with open(self.eval_dir / "evals.txt", "a") as f:
+            f.write(f"Epoch: {epoch}, FID: {self.fid}, IS: {self.is_score}\n")
 
     def train(self):
         print(f"Starting training {self.name}")
 
         self.init_GAN()
         self.set_data_src()
-        self._toggle_all_networks("train")
+        self.save_configs()
+        self._toggle_networks("train")
 
         # adversarial ground truths
         valid_patch_A = torch.ones((self.batch_size, *self.D_A.output_shape), requires_grad=False).cuda()
@@ -314,7 +320,7 @@ class Trainer():
                 loss_cycle = (loss_cycle_A + loss_cycle_B) * 0.5
 
                 # Total Variation loss
-                loss_tv = self.criterion_tv(fake_A)  # do it only for A>B
+                # loss_tv = self.criterion_tv(fake_A)  # do it only for A>B
 
                 # Structural Similarity loss
                 loss_ssim_G_A = self.criterion_ssim(fake_A, real_A)
@@ -326,7 +332,7 @@ class Trainer():
                 loss_G += self.lambda_cycle * loss_cycle
                 loss_G += self.lambda_ssim * loss_ssim
                 # loss_G += self.lambda_identity * loss_identity
-                loss_G += loss_tv * self.lambda_tv
+                # loss_G += loss_tv * self.lambda_tv
                 
                 loss_G.backward()
                 self.optim_G.step()
@@ -365,9 +371,9 @@ class Trainer():
                 self.logger.track(loss_adv_G.item(), "loss_adv_G")
                 self.logger.track(loss_cycle.item(), "loss_cycle")
                 # self.logger.track(loss_identity.item(), "loss_identity")
-                self.logger.track(loss_tv.item(), "loss_tv")
+                # self.logger.track(loss_tv.item(), "loss_tv")
                 sys.stdout.write(
-                    "\r [Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f, adv: %f, cycle: %f, ssim: %f, tv: %f]"
+                    "\r [Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f, adv: %f, cycle: %f, ssim: %f]"
                     % (
                         epoch,
                         self.epochs,
@@ -378,11 +384,11 @@ class Trainer():
                         loss_adv_G.item(),
                         loss_cycle.item(),
                         loss_ssim.item(),
-                        loss_tv.item()
+                        # loss_tv.item()
                     )
                 )
             
-            if self.calculate_fid_every and epoch % self.calculate_fid_every == 0 and epoch != 0:
+            if self.calculate_eval_every and epoch % self.calculate_eval_every == 0 and epoch != 0:
                 self.calculate_fid(epoch)
             self.logger.track(self.fid, "fid")
 

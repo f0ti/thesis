@@ -1,12 +1,14 @@
-import random
 import torch
+import random
 import numpy as np
-import matplotlib.pyplot as plt
 import seaborn as sns
 import torch.nn.init as init
+import matplotlib.pyplot as plt
 
 from typing import Tuple
 from torch import Tensor
+from torch.optim import lr_scheduler
+
 
 def adjust_dynamic_range(
     data: Tensor,
@@ -21,6 +23,14 @@ def adjust_dynamic_range(
         data = data * scale + bias
 
     return torch.clamp(data, min=drange_out[0], max=drange_out[1])
+
+
+def get_scheduler(optimizer, n_epochs, n_epochs_decay):
+    def lambda_rule(epoch):
+        lr_l = 1.0 - max(0, epoch - n_epochs) / float(n_epochs_decay + 1)
+        return lr_l
+    scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda_rule)
+    return scheduler
 
 
 def init_weights(m, init_type='normal', init_gain=0.02):

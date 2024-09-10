@@ -80,9 +80,7 @@ class GeneratorResNet(nn.Module):
     
 
 class GeneratorUNet(nn.Module):
-    """Create a Unet-based generator"""
-
-    def __init__(self, input_nc, output_nc, num_downs, ngf=64, norm_layer=nn.BatchNorm2d, use_dropout=False):
+    def __init__(self, input_nc: int, output_nc: int, num_downs: int, ngf: int = 64, norm_layer=nn.BatchNorm2d, use_dropout: bool = False, upsample: bool = False):
         super(GeneratorUNet, self).__init__()
 
         unet_block = UnetSkipConnectionBlock(ngf * 8, ngf * 8, input_nc=None, submodule=None, norm_layer=norm_layer, innermost=True)  # add the innermost layer
@@ -101,7 +99,7 @@ class GeneratorUNet(nn.Module):
 
 
 class UnetSkipConnectionBlock(nn.Module):
-    def __init__(self, outer_nc, inner_nc, input_nc=None,
+    def __init__(self, outer_nc, inner_nc, input_nc=None, upsample=False,
                  submodule=None, outermost=False, innermost=False, norm_layer=nn.BatchNorm2d, use_dropout=False):
         super(UnetSkipConnectionBlock, self).__init__()
 
@@ -115,34 +113,29 @@ class UnetSkipConnectionBlock(nn.Module):
         downnorm = norm_layer(inner_nc)
         uprelu = nn.ReLU(True)
         upnorm = norm_layer(outer_nc)
-
+        
         model = []
+
+        # Choose between transposed convolution or upsample + convolution
+        if upsample:
+            upsample_layer = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+            upconv = nn.Conv2d(inner_nc * 2 if not innermost else inner_nc, outer_nc,
+                               kernel_size=3, stride=1, padding=1)
+        else:
+            upconv = nn.ConvTranspose2d(inner_nc * 2 if not innermost else inner_nc, outer_nc,
+                                        kernel_size=4, stride=2, padding=1)
+
         if outermost:
-            # Replace ConvTranspose2d with Upsample + ReflectionPad2d + Conv2d
-            upsample = nn.Upsample(scale_factor=2, mode='bilinear')
-            uppad = nn.ReflectionPad2d(1)
-            upconv = nn.Conv2d(inner_nc * 2, outer_nc,
-                               kernel_size=3, stride=1, padding=0)
             down = [downconv]
-            up = [uprelu, upsample, uppad, upconv, nn.Tanh()]
+            up = [uprelu, upsample_layer if upsample else upconv, nn.Tanh()]
             model = down + [submodule] + up
         elif innermost:
-            # Replace ConvTranspose2d with Upsample + ReflectionPad2d + Conv2d
-            upsample = nn.Upsample(scale_factor=2, mode='bilinear')
-            uppad = nn.ReflectionPad2d(1)
-            upconv = nn.Conv2d(inner_nc, outer_nc,
-                               kernel_size=3, stride=1, padding=0, bias=use_bias)
             down = [downrelu, downconv]
-            up = [uprelu, upsample, uppad, upconv, upnorm]
+            up = [uprelu, upsample_layer if upsample else upconv, upnorm]
             model = down + up
         else:
-            # Replace ConvTranspose2d with Upsample + ReflectionPad2d + Conv2d
-            upsample = nn.Upsample(scale_factor=2, mode='bilinear')
-            uppad = nn.ReflectionPad2d(1)
-            upconv = nn.Conv2d(inner_nc * 2, outer_nc,
-                               kernel_size=3, stride=1, padding=0, bias=use_bias)
             down = [downrelu, downconv, downnorm]
-            up = [uprelu, upsample, uppad, upconv, upnorm]
+            up = [uprelu, upsample_layer if upsample else upconv, upnorm]
             model = down + [submodule] + up
             if use_dropout:
                 model += [nn.Dropout(0.5)]
@@ -154,6 +147,7 @@ class UnetSkipConnectionBlock(nn.Module):
             return self.model(x)
         else:   # add skip connections
             return torch.cat([x, self.model(x)], 1)
+
 
 
 class Discriminator(nn.Module):

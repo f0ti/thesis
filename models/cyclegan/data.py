@@ -176,7 +176,7 @@ class Maps(Dataset):
 
     def __getitem__(self, index):
         img = Image.open(os.path.join(self.images_path, self.image_samples[index]))
-        img = self.transform(img)  # to tensor
+        img = self.transform(img)
 
         # half left is input, half right is label
         input = img[:, :, : img.shape[2] // 2]
