@@ -4,3 +4,4 @@ utils/experiment.py
 *.txt
 filtered_out*/
 maps/
+estonia/

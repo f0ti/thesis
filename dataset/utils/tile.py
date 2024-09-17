@@ -12,13 +12,13 @@ QUIET = True
 
 class Tile:
 
-    def __init__(self, filename) -> None:
-        self.filename = filename
+    def __init__(self, filename: str) -> None:
+        self.filename: str = filename
         self.points = []
         self.read_points()
 
     @property
-    def colors(self) -> List:
+    def rgb(self) -> List:
         return [(point.R, point.G, point.B) for point in self.points]
 
     @property
@@ -52,6 +52,7 @@ class Tile:
             self.width = int(h_data[0])
             self.height = int(h_data[1])
             self.nr_points = int.from_bytes(reader.read(4), byteorder="little")
+            self.nr_points = int(self.width * self.height)
 
             for _ in tqdm(range(self.nr_points), disable=QUIET):
                 data = unpack("<dddBBBBI?", reader.read(33))
@@ -75,7 +76,7 @@ class Tile:
         try:
             img = plt.imread(f"imgs/{img_name}.png")
         except FileNotFoundError:
-            img = np.asarray(self.colors, dtype=np.uint8).reshape(
+            img = np.asarray(self.rgb, dtype=np.uint8).reshape(
                 self.width, self.height, 3
             )
 
@@ -106,7 +107,7 @@ class Tile:
         return img
 
     def save_rgb(self, root) -> None:
-        img = np.asarray(self.colors, dtype=np.float32).reshape(
+        img = np.asarray(self.rgb, dtype=np.float32).reshape(
             self.width, self.height, 3
         )
         img = self._scale_rgb(img)
@@ -122,6 +123,22 @@ class Tile:
         z = np.asarray(self.Z, dtype=np.float32).reshape(self.width, self.height, 1)
         z_name = self.filename.split("/")[-1]
         np.save(f"{root}/{z_name}.npy", z)
+
+    def save_i(self, root) -> None:
+        intensity = np.asarray(self.intensities, dtype=np.float32).reshape(
+            self.width, self.height, 1
+        )
+        i_name = self.filename.split("/")[-1]
+        np.save(f"{root}/{i_name}.npy", intensity)
+
+    def save_zi(self, root) -> None:
+        z = np.asarray(self.Z, dtype=np.float32).reshape(self.width, self.height, 1)
+        intensity = np.asarray(self.intensities, dtype=np.float32).reshape(
+            self.width, self.height, 1
+        )
+        z_intensity = np.concatenate((z, intensity), axis=2)
+        z_intensity_name = self.filename.split("/")[-1]
+        np.save(f"{root}/{z_intensity_name}.npy", z_intensity)
 
     def save_dtm(self, root) -> None:
         Z = np.asarray(self.Z, dtype=np.float64).reshape(self.width, self.height, 1)
