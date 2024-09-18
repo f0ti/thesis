@@ -2,12 +2,11 @@ import os
 import sys
 from tile import Tile
 
-# change for different dataset
 class Extractor():
-    def __init__(self, dataset_name, mode: str="z") -> None:
-        assert dataset_name in ["melbourne-top", "melbourne-z-top", "estonia"]
-        self.dataset_name = dataset_name
-        if self.dataset_name == "estonia":
+    def __init__(self, dataset, mode: str="z") -> None:
+        assert dataset in ["melbourne-top", "melbourne-z-top", "estonia"]
+        self.dataset = dataset
+        if self.dataset == "estonia":
             self.tile_bytesize = 2228236
         else:
             self.tile_bytesize = 2162700
@@ -15,9 +14,9 @@ class Extractor():
         assert mode in ["z", "xyz", "zi", "i"]
         self.mode = mode
 
-        self.base_dir = f"../{self.dataset_name}/tiles_data"
-        self.rgb_dir  = f"../{self.dataset_name}/rgb_data"
-        self.coo_dir  = f"../{self.dataset_name}/{self.mode}_data"
+        self.base_dir = f"../{self.dataset}/tiles_data"
+        self.rgb_dir  = f"../{self.dataset}/rgb_data"
+        self.coo_dir  = f"../{self.dataset}/{self.mode}_data"
 
         self.num_tiles = len(os.listdir(self.base_dir))
 
@@ -46,7 +45,7 @@ class Extractor():
                 raise ValueError("Invalid type")
 
 if __name__ == "__main__":
-    dataset_name = sys.argv[1]
+    dataset = sys.argv[1]
     mode = sys.argv[2]
-    extractor = Extractor(dataset_name, mode)
+    extractor = Extractor(dataset, mode)
     extractor.generate_data()

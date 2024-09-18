@@ -116,8 +116,9 @@ class Splitter():
 
 if __name__ == "__main__":
     dataset_name = sys.argv[1]
+    data_type = "zi_data"
     cluster_model = ImageHistogramClustering(dataset_name, n_clusters=2)
     clusters = cluster_model.cluster()
 
-    splitter = Splitter(dataset_name=dataset_name, data_type='z_data', n_clusters=2, clusters=clusters, split_ratio=0.8, del_artifacts=False)
+    splitter = Splitter(dataset_name=dataset_name, data_type=data_type, n_clusters=2, clusters=clusters, split_ratio=0.8, del_artifacts=False)
     splitter.split()

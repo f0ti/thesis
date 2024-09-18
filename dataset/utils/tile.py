@@ -51,7 +51,7 @@ class Tile:
             h_data: tuple = unpack("ff", reader.read(8))
             self.width = int(h_data[0])
             self.height = int(h_data[1])
-            self.nr_points = int.from_bytes(reader.read(4), byteorder="little")
+            _ = int.from_bytes(reader.read(4), byteorder="little")
             self.nr_points = int(self.width * self.height)
 
             for _ in tqdm(range(self.nr_points), disable=QUIET):
