@@ -2,6 +2,7 @@ import argparse
 import imageio
 import os
 from natsort import natsorted
+from requests import get
 
 parser = argparse.ArgumentParser()
 parser.add_argument("run_name")
@@ -36,17 +37,20 @@ def save_each():
         print(f"Saved {gif_path}")
 
 # use this script when the image contains them all in grid
-def save_group():
+def save_group(get_every=1):
     # Get a sorted list of all image files in the input directory
     image_files = natsorted([f for f in os.listdir(input_dir) if f.endswith('.png')])
+    print(f"Found {len(image_files)} images")
+    image_files = image_files[::get_every]
+    print(f"Reduced to {len(image_files)} images")
 
     images = []
     for img in image_files:
         image_path = os.path.join(input_dir, img)
-        images.append(imageio.imread(image_path))
+        images.append(imageio.v2.imread(image_path))
 
     gif_path = os.path.join(output_dir, f"progression_{len(images)}.gif")
     imageio.mimsave(gif_path, images, duration=0.5)  # Adjust duration if needed
-    print(f"Saved {gif_path}")
+    print(f"open {gif_path}")
 
-save_group()
+save_group(get_every=5)

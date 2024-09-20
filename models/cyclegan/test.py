@@ -1,7 +1,6 @@
 import os
-from numpy import real
-from scipy.__config__ import show
 import torch
+import string
 
 from pathlib import Path
 from torch.utils.data import DataLoader
@@ -18,7 +17,7 @@ class Sampler():
     def __init__(
         self,
         run_name: str = "2024-09-19_20-20-04_estonia_resnet9",
-        model_epoch: str = "32",
+        model_epoch: str = "38",
         dataset_name: str = "estonia",
         threads: int = 8,
         generator_type: str = "resnet9",
@@ -26,26 +25,29 @@ class Sampler():
         input_channel: int = 1,
         target_channel: int = 3,
         num_samples: int = 9,
-        save_images: bool = False
+        save_images: bool = True
     ) -> None:
         
-        assert generator_mode in ("AB", "BA")
         model_dir = Path("saved_models")
         if generator_mode == "AB":
             self.model_path = model_dir / run_name / f"G_AB_{model_epoch}.pth"
-        else:
+        elif generator_mode == "BA":
             self.model_path = model_dir / run_name / f"G_BA_{model_epoch}.pth"
+        else:
+            raise ValueError(f"Unknown generator mode: {generator_mode}")
+        
         self.dataset_name = dataset_name
         self.threads = threads
         self.generator_type = generator_type
         self.generator_mode = generator_mode
         self.input_channel = input_channel
         self.target_channel = target_channel
+        
         self.num_samples = num_samples
         self.save_images = save_images
         if self.save_images:
-            os.makedirs("sampled_images", exist_ok=True)
-            self.image_dir = Path("sampled_images") / f"{run_name}_G_{generator_mode}_{model_epoch}"
+            self.image_dir = Path("sampled_images") / f"{run_name}_G_{generator_mode}_{model_epoch}_{dataset_name}"
+            os.makedirs(self.image_dir, exist_ok=True)
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -94,13 +96,15 @@ class Sampler():
         self.sample_dl = DataLoader(dataset=self.sample_set, num_workers=self.threads, batch_size=self.num_samples, shuffle=True)
 
     def sample_images(self, num_samples, grid=True):
-        real_images, fake_images = Tensor([]).to(self.device), Tensor([]).to(self.device)
-        for i, batch in enumerate(self.sample_dl):
+        input_images, real_images, fake_images = Tensor([]).to(self.device), Tensor([]).to(self.device), Tensor([]).to(self.device)
+        for batch in self.sample_dl:
+            uid = "".join(random.choices(string.ascii_letters + string.digits, k=5))
             # change input to be label if generator is BA
             real_A = batch["A"].to(self.device)
             real_B = batch["B"].to(self.device)
             fake_B = self.gen(real_A)
             if grid:
+                input_images = torch.cat((input_images, real_A), 0)
                 fake_images = torch.cat((fake_images, fake_B), 0)
                 real_images = torch.cat((real_images, real_B), 0)
             else:
@@ -109,10 +113,9 @@ class Sampler():
                 show_rgb(fake_B)
                 show_rgb(real_B)
                 if self.save_images:
-                    uid = np.random.randint(0, 1000)
-                    save_image(real_A, os.path.join(self.image_dir, f"real_A_{num_samples}_{uid}.png"))  # input
-                    save_image(real_B, os.path.join(self.image_dir, f"real_B_{num_samples}_{uid}.png"))  # target
-                    save_image(fake_B, os.path.join(self.image_dir, f"fake_B_{num_samples}_{uid}.png"))  # output
+                    save_image(real_A, os.path.join(self.image_dir, f"real_A_{uid}.png"))  # input
+                    save_image(real_B, os.path.join(self.image_dir, f"real_B_{uid}.png"))  # target
+                    save_image(fake_B, os.path.join(self.image_dir, f"fake_B_{uid}.png"))  # output
 
         if grid:
             fake_grid = make_grid(fake_images, nrow=3, normalize=True)
@@ -120,8 +123,8 @@ class Sampler():
             real_grid = make_grid(real_images, nrow=3, normalize=True)
             show_grid(real_grid)
             if self.save_images:
-                save_image(real_grid, os.path.join(self.image_dir, f"real_B_{num_samples}.png"))
-                save_image(fake_grid, os.path.join(self.image_dir, f"fake_B_{num_samples}.png"))
+                save_image(real_grid, os.path.join(self.image_dir, f"real_A_{num_samples}_{uid}.png"))
+                save_image(fake_grid, os.path.join(self.image_dir, f"fake_B_{num_samples}_{uid}.png"))
 
 if __name__ == "__main__":
     sampler = Sampler()

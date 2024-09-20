@@ -263,7 +263,7 @@ class Trainer():
                 if epoch == 0:
                     real_images = torch.cat((real_images, batch["B"].to(self.device)), 0)
             else:
-                save_image(fake_B, os.path.join(self.image_dir, f"fake_B_{epoch}_{sample_num}_{i}.png"))  # save individual images
+                save_image(fake_B, os.path.join(self.image_dir, f"fake_B_{epoch}_{sample_num}_{i}.png"))
 
         if grid:
             fake_grid = make_grid(fake_images, nrow=3, normalize=True)
