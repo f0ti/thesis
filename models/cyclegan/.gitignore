@@ -94,5 +94,6 @@ saved_models/
 saved_images/
 saved_gifs/
 fid/
+clean
 models_vault/
 .aim/*

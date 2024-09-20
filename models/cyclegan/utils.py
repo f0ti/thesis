@@ -4,6 +4,7 @@ import numpy as np
 import seaborn as sns
 import torch.nn.init as init
 import matplotlib.pyplot as plt
+import torchvision.transforms.functional as F
 
 from typing import Tuple
 from torch import Tensor
@@ -87,14 +88,28 @@ def show_xyz(images, cols=4, figsize=(20, 20)):
     plt.show()
 
 def show_z(images, cols=4, figsize=(20, 20)):
+    images = images.cpu().detach().numpy()
     rows = len(images) // cols
     fig, axs = plt.subplots(rows, cols, figsize=figsize)
     for i, ax in enumerate(axs.flat):
         # show only Z channel
         img = images[i]
-        ax.imshow(img)
+        img = np.transpose(img, (1, 2, 0))
+        ax.imshow(img, cmap='gray')
         ax.axis('off')
     plt.tight_layout()
+    plt.show()
+
+def show_grid(imgs):
+    if not isinstance(imgs, list):
+        imgs = [imgs]
+    fig, axs = plt.subplots(ncols=len(imgs), squeeze=False)
+    for i, img in enumerate(imgs):
+        img = img.detach()
+        img = F.to_pil_image(img)
+        axs[0, i].imshow(np.asarray(img))
+        axs[0, i].set(xticklabels=[], yticklabels=[], xticks=[], yticks=[])
+
     plt.show()
 
 def show_diff(ground_truth, predicted, cols=4, figsize=(20, 20)):
