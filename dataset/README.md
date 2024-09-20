@@ -4,7 +4,7 @@ This module contains all scripts needed for generating the dataset.
 
 ## Melbourne
 
-For the ![melbourne dataset](https://discover.data.vic.gov.au/dataset/city-of-melbourne-3d-point-cloud-2018) we have the following structure:
+For the [melbourne dataset](https://discover.data.vic.gov.au/dataset/city-of-melbourne-3d-point-cloud-2018) we have the following structure:
 
 - ```raw_data``` - extracted .las data and tiles from zip
 - ```las_data``` - contains the .las data
