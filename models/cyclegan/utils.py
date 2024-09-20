@@ -11,6 +11,33 @@ from torch import Tensor
 from torch.optim import lr_scheduler
 
 
+class ReplayBuffer:
+    def __init__(self, max_size=50):
+        assert max_size > 0, "Empty buffer or trying to create a black hole. Be careful."
+        self.max_size = max_size
+        self.data = []
+
+    def push_and_pop(self, data):
+        to_return = []
+        for element in data.data:
+            element = torch.unsqueeze(element, 0)
+            if len(self.data) < self.max_size:
+                self.data.append(element)
+                to_return.append(element)
+            else:
+                if random.uniform(0, 1) > 0.5:
+                    i = random.randint(0, self.max_size - 1)
+                    to_return.append(self.data[i].clone())
+                    self.data[i] = element
+                else:
+                    to_return.append(element)
+        return torch.cat(to_return)
+
+def print_model_parameters(model):
+    for p in model.named_parameters():
+        print(p)
+
+
 def adjust_dynamic_range(
     data: Tensor,
     drange_in: Tuple[float, float] = (0.0, 1.0),
@@ -35,13 +62,6 @@ def get_scheduler(optimizer, n_epochs, n_epochs_decay):
 
 
 def init_weights(m, init_type='normal', init_gain=0.02):
-    """Initialize network weights.
-    
-    Parameters:
-        m (nn.Module): network to initialize
-        init_type (str): initialization method: normal | xavier | kaiming
-        init_gain (float): scaling factor for normal, xavier and kaiming.
-    """
     def init_func(m):
         classname = m.__class__.__name__
         if hasattr(m, 'weight') and (classname.find('Conv') != -1 or classname.find('Linear') != -1):
@@ -62,7 +82,7 @@ def init_weights(m, init_type='normal', init_gain=0.02):
     m.apply(init_func)
 
 # ----------------
-# Debug functions
+# Display debug functions
 # ----------------
 
 def show_rgb(images, cols=4, figsize=(20, 20)):
@@ -130,34 +150,3 @@ def show_diff(ground_truth, predicted, cols=4, figsize=(20, 20)):
         ax.axis('off')
     plt.tight_layout()
     plt.show()
-
-def print_weights(model):
-    for name, param in model.named_parameters():
-        print(name, param)
-
-class ReplayBuffer:
-    def __init__(self, max_size=50):
-        assert max_size > 0, "Empty buffer or trying to create a black hole. Be careful."
-        self.max_size = max_size
-        self.data = []
-
-    def push_and_pop(self, data):
-        to_return = []
-        for element in data.data:
-            element = torch.unsqueeze(element, 0)
-            if len(self.data) < self.max_size:
-                self.data.append(element)
-                to_return.append(element)
-            else:
-                if random.uniform(0, 1) > 0.5:
-                    i = random.randint(0, self.max_size - 1)
-                    to_return.append(self.data[i].clone())
-                    self.data[i] = element
-                else:
-                    to_return.append(element)
-        return torch.cat(to_return)
-
-
-def print_model_parameters(model):
-    for p in model.named_parameters():
-        print(p)

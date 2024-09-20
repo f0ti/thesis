@@ -1,4 +1,5 @@
 import os
+import fire
 import torch
 import string
 
@@ -17,15 +18,16 @@ class Sampler():
     def __init__(
         self,
         run_name: str = "2024-09-19_20-20-04_estonia_resnet9",
-        model_epoch: str = "38",
-        dataset_name: str = "estonia",
+        model_epoch: str = "42",
+        dataset_name: str = "melbourne-z-top",
         threads: int = 8,
         generator_type: str = "resnet9",
         generator_mode: str = "AB",
         input_channel: int = 1,
         target_channel: int = 3,
         num_samples: int = 9,
-        save_images: bool = True
+        save_images: bool = True,
+        make_grid: bool = True
     ) -> None:
         
         model_dir = Path("saved_models")
@@ -45,6 +47,7 @@ class Sampler():
         
         self.num_samples = num_samples
         self.save_images = save_images
+        self.make_grid = make_grid
         if self.save_images:
             self.image_dir = Path("sampled_images") / f"{run_name}_G_{generator_mode}_{model_epoch}_{dataset_name}"
             os.makedirs(self.image_dir, exist_ok=True)
@@ -95,7 +98,10 @@ class Sampler():
 
         self.sample_dl = DataLoader(dataset=self.sample_set, num_workers=self.threads, batch_size=self.num_samples, shuffle=True)
 
-    def sample_images(self, num_samples, grid=True):
+    def sample(self):
+        self.init_generator()
+        self.init_dataloader()
+
         input_images, real_images, fake_images = Tensor([]).to(self.device), Tensor([]).to(self.device), Tensor([]).to(self.device)
         for batch in self.sample_dl:
             uid = "".join(random.choices(string.ascii_letters + string.digits, k=5))
@@ -103,7 +109,7 @@ class Sampler():
             real_A = batch["A"].to(self.device)
             real_B = batch["B"].to(self.device)
             fake_B = self.gen(real_A)
-            if grid:
+            if self.make_grid:
                 input_images = torch.cat((input_images, real_A), 0)
                 fake_images = torch.cat((fake_images, fake_B), 0)
                 real_images = torch.cat((real_images, real_B), 0)
@@ -117,17 +123,14 @@ class Sampler():
                     save_image(real_B, os.path.join(self.image_dir, f"real_B_{uid}.png"))  # target
                     save_image(fake_B, os.path.join(self.image_dir, f"fake_B_{uid}.png"))  # output
 
-        if grid:
+        if self.make_grid:
             fake_grid = make_grid(fake_images, nrow=3, normalize=True)
             show_grid(fake_grid)
             real_grid = make_grid(real_images, nrow=3, normalize=True)
             show_grid(real_grid)
             if self.save_images:
-                save_image(real_grid, os.path.join(self.image_dir, f"real_A_{num_samples}_{uid}.png"))
-                save_image(fake_grid, os.path.join(self.image_dir, f"fake_B_{num_samples}_{uid}.png"))
+                save_image(real_grid, os.path.join(self.image_dir, f"real_A_{self.num_samples}_{uid}.png"))
+                save_image(fake_grid, os.path.join(self.image_dir, f"fake_B_{self.num_samples}_{uid}.png"))
 
 if __name__ == "__main__":
-    sampler = Sampler()
-    sampler.init_generator()
-    sampler.init_dataloader()
-    sampler.sample_images(num_samples=sampler.num_samples, grid=True)
+    fire.Fire(Sampler)

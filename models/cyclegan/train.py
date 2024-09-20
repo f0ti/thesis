@@ -1,14 +1,15 @@
 import os
-import datetime
-import torch
 import aim
 import sys
+import torch
+import fire
+import datetime
 
 from pathlib import Path
-from torchvision.utils import save_image, make_grid
-from torch.utils.data import DataLoader
 from ignite.engine import Engine
 from ignite.metrics import FID, InceptionScore
+from torch.utils.data import DataLoader
+from torchvision.utils import save_image, make_grid
 
 from utils import *
 from model import *
@@ -421,5 +422,5 @@ class Trainer():
 
             self.update_learning_rate()
 
-trainer = Trainer()
-trainer.train()
+if __name__ == '__main__':
+    fire.Fire(Trainer)
