@@ -10,7 +10,7 @@ from torchvision.transforms.functional import rgb_to_grayscale
 from PIL import Image
 from dotenv import load_dotenv
 
-from utils import adjust_dynamic_range
+from utils import adjust_range
 
 load_dotenv()
 
@@ -96,7 +96,7 @@ class MelbourneZRGB(Dataset):
         dataset: str = "melbourne-z-top",
         image_set: str = "train",
         max_samples: Optional[int] = None,
-        adjust_dynamic_range: bool = False,
+        adjust_range: bool = False,
     ):
         super().__init__()
 
@@ -108,7 +108,7 @@ class MelbourneZRGB(Dataset):
         self.image_set = image_set
         self.max_samples = max_samples
         self.transform = get_transform()
-        self.adjust_dynamic_range = adjust_dynamic_range
+        self.adjust_range = adjust_range
 
         dataset_path = os.path.join(self.base_dir, self.dataset)
 
@@ -135,9 +135,9 @@ class MelbourneZRGB(Dataset):
             input = self.transform(input)
             label = self.transform(label)
 
-        if self.adjust_dynamic_range:
-            input = adjust_dynamic_range(input, (0, 1), (-1, 1))
-            label = adjust_dynamic_range(label, (0, 1), (-1, 1))
+        if self.adjust_range:
+            input = adjust_range(input, (0, 1), (-1, 1))
+            label = adjust_range(label, (0, 1), (-1, 1))
 
         return {"A": input, "B": label}
 
@@ -148,10 +148,10 @@ class EstoniaZIRGB(Dataset):
     """
     def __init__(
         self,
-        dataset: str = "estonia",
+        dataset: str = "estonia-zi",
         image_set: str = "train",
         max_samples: Optional[int] = None,
-        adjust_dynamic_range: bool = False,
+        adjust_range: bool = False,
     ):
         super().__init__()
 
@@ -163,7 +163,7 @@ class EstoniaZIRGB(Dataset):
         self.image_set = image_set
         self.max_samples = max_samples
         self.transform = get_transform()
-        self.adjust_dynamic_range = adjust_dynamic_range
+        self.adjust_range = adjust_range
 
         dataset_path = os.path.join(self.base_dir, self.dataset)
 
@@ -186,16 +186,13 @@ class EstoniaZIRGB(Dataset):
         input = np.load(input_path)
         label = np.load(label_path)
 
-        # scale the intensity values to [0, 1]
-        input[:, :, 1] = input[:, :, 1] / 255.0
-
         if self.transform is not None:
             input = self.transform(input)
             label = self.transform(label)
 
-        if self.adjust_dynamic_range:
-            input = adjust_dynamic_range(input, (0, 1), (-1, 1))
-            label = adjust_dynamic_range(label, (0, 1), (-1, 1))
+        if self.adjust_range:
+            input = adjust_range(input, (0, 1), (-1, 1))
+            label = adjust_range(label, (0, 1), (-1, 1))
 
         return {"A": input, "B": label}
 
@@ -206,14 +203,14 @@ class EstoniaZRGB(Dataset):
     """
     def __init__(
         self,
-        dataset: str = "estonia",
+        dataset: str = "estonia-z",
         image_set: str = "train",
         max_samples: Optional[int] = None,
-        adjust_dynamic_range: bool = False,
+        adjust_range: bool = False,
     ):
         super().__init__()
 
-        assert dataset in ["estonia"], "Dataset not supported for ZIRGB"
+        assert dataset in ["estonia-z"], "Dataset not supported for ZIRGB"
         assert image_set in ["train", "test", "val"]
 
         self.dataset = dataset
@@ -221,11 +218,11 @@ class EstoniaZRGB(Dataset):
         self.image_set = image_set
         self.max_samples = max_samples
         self.transform = get_transform()
-        self.adjust_dynamic_range = adjust_dynamic_range
+        self.adjust_range = adjust_range
 
         dataset_path = os.path.join(self.base_dir, self.dataset)
 
-        self.zi_path = os.path.join(dataset_path, image_set, "zi_data")
+        self.zi_path = os.path.join(dataset_path, image_set, "z_data")
         self.rgb_path = os.path.join(dataset_path, image_set, "rgb_data")
         self.zi_samples = sorted(os.listdir(self.zi_path))[:max_samples]
         self.rgb_samples = sorted(os.listdir(self.rgb_path))[:max_samples]
@@ -244,16 +241,13 @@ class EstoniaZRGB(Dataset):
         input = np.load(input_path)
         label = np.load(label_path)
 
-        # get Z
-        input = input[:, :, 0]
-
         if self.transform is not None:
             input = self.transform(input)
             label = self.transform(label)
 
-        if self.adjust_dynamic_range:
-            input = adjust_dynamic_range(input, (0, 1), (-1, 1))
-            label = adjust_dynamic_range(label, (0, 1), (-1, 1))
+        if self.adjust_range:
+            input = adjust_range(input, (0, 1), (-1, 1))
+            label = adjust_range(label, (0, 1), (-1, 1))
 
         return {"A": input, "B": label}
 
@@ -264,14 +258,14 @@ class EstoniaIRGB(Dataset):
     """
     def __init__(
         self,
-        dataset: str = "estonia",
+        dataset: str = "estonia-i",
         image_set: str = "train",
         max_samples: Optional[int] = None,
-        adjust_dynamic_range: bool = False,
+        adjust_range: bool = False,
     ):
         super().__init__()
 
-        assert dataset in ["estonia"], "Dataset not supported for ZIRGB"
+        assert dataset in ["estonia-i"], "Dataset not supported for ZIRGB"
         assert image_set in ["train", "test", "val"]
 
         self.dataset = dataset
@@ -279,11 +273,11 @@ class EstoniaIRGB(Dataset):
         self.image_set = image_set
         self.max_samples = max_samples
         self.transform = get_transform()
-        self.adjust_dynamic_range = adjust_dynamic_range
+        self.adjust_range = adjust_range
 
         dataset_path = os.path.join(self.base_dir, self.dataset)
 
-        self.zi_path = os.path.join(dataset_path, image_set, "zi_data")
+        self.zi_path = os.path.join(dataset_path, image_set, "i_data")
         self.rgb_path = os.path.join(dataset_path, image_set, "rgb_data")
         self.zi_samples = sorted(os.listdir(self.zi_path))[:max_samples]
         self.rgb_samples = sorted(os.listdir(self.rgb_path))[:max_samples]
@@ -302,16 +296,13 @@ class EstoniaIRGB(Dataset):
         input = np.load(input_path)
         label = np.load(label_path)
 
-        # get intensity
-        input = input[:, :, 1] / 255.0
-
         if self.transform is not None:
             input = self.transform(input)
             label = self.transform(label)
 
-        if self.adjust_dynamic_range:
-            input = adjust_dynamic_range(input, (0, 1), (-1, 1))
-            label = adjust_dynamic_range(label, (0, 1), (-1, 1))
+        if self.adjust_range:
+            input = adjust_range(input, (0, 1), (-1, 1))
+            label = adjust_range(label, (0, 1), (-1, 1))
 
         return {"A": input, "B": label}
 
@@ -322,7 +313,7 @@ class Maps(Dataset):
         dataset: str = "maps",
         image_set: str = "train",
         max_samples: Optional[int] = None,
-        adjust_dynamic_range: bool = False,
+        adjust_range: bool = False,
     ):
         super().__init__()
 
@@ -345,7 +336,7 @@ class Maps(Dataset):
         dataset_path = os.path.join(self.base_dir, self.dataset)
         self.images_path = os.path.join(dataset_path, image_set)
         self.image_samples = sorted(os.listdir(self.images_path))[:max_samples]
-        self.adjust_dynamic_range = adjust_dynamic_range
+        self.adjust_range = adjust_range
 
     def __len__(self) -> int:
         return len(self.image_samples)
@@ -361,9 +352,9 @@ class Maps(Dataset):
         input = self.resize(input)
         label = self.resize(label)
 
-        if self.adjust_dynamic_range:
-            input = adjust_dynamic_range(input, (0, 1), (-1, 1))
-            label = adjust_dynamic_range(label, (0, 1), (-1, 1))
+        if self.adjust_range:
+            input = adjust_range(input, (0, 1), (-1, 1))
+            label = adjust_range(label, (0, 1), (-1, 1))
 
         return {"A": input, "B": label}
 
@@ -374,7 +365,7 @@ class GrayMaps(Dataset):
         dataset: str = "maps",
         image_set: str = "train",
         max_samples: Optional[int] = None,
-        adjust_dynamic_range: bool = False,
+        adjust_range: bool = False,
     ):
         super().__init__()
 
@@ -397,7 +388,7 @@ class GrayMaps(Dataset):
         dataset_path = os.path.join(self.base_dir, self.dataset)
         self.images_path = os.path.join(dataset_path, image_set)
         self.image_samples = sorted(os.listdir(self.images_path))[:max_samples]
-        self.adjust_dynamic_range = adjust_dynamic_range
+        self.adjust_range = adjust_range
 
     def __len__(self) -> int:
         return len(self.image_samples)
@@ -414,8 +405,8 @@ class GrayMaps(Dataset):
         input = self.resize(input)
         label = self.resize(label)
         
-        if self.adjust_dynamic_range:
-            input = adjust_dynamic_range(input, (0, 1), (-1, 1))
-            label = adjust_dynamic_range(label, (0, 1), (-1, 1))
+        if self.adjust_range:
+            input = adjust_range(input, (0, 1), (-1, 1))
+            label = adjust_range(label, (0, 1), (-1, 1))
 
         return {"A": input, "B": label}

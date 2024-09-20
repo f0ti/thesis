@@ -22,15 +22,15 @@ class Trainer():
         base_dir = ".",
         model_dir = "saved_models",
         image_dir = "saved_images",
-        load_from_model_dir: str = "2024-09-19_18-46-32_graymaps_resnet9",
+        load_from_model_dir: str = "2024-09-19_20-20-04_estonia_resnet9",
         load_from_model_epoch: int = 48,
         epochs: int = 10,
-        epochs_decay: int = 40,
-        dataset_name: str = "estonia",
+        epochs_decay: int = 20,
+        dataset_name: str = "estonia-i",
         image_size: int = 256,
         input_image_channel: int = 1,
         target_image_channel: int = 3,
-        adjust_dynamic_range: bool = False,
+        adjust_range: bool = False,
         generator_type: str = "resnet9",
         batch_size: int = 2,
         lr_gen = 2e-4,
@@ -97,7 +97,7 @@ class Trainer():
         self.image_size = image_size
         self.input_image_channel = input_image_channel
         self.target_image_channel = target_image_channel
-        self.adjust_dynamic_range = adjust_dynamic_range
+        self.adjust_range = adjust_range
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.logger = aim.Run()
@@ -193,28 +193,36 @@ class Trainer():
             self.sample_set = MelbourneXYZRGB(dataset=self.dataset_name, image_set="test", max_samples=self.sample_num)
             self.eval_set   = MelbourneXYZRGB(dataset=self.dataset_name, image_set="test", max_samples=self.calculate_eval_samples)
         elif self.dataset_name == "melbourne-z-top":
-            self.train_set  = MelbourneZRGB(dataset=self.dataset_name, image_set="train", adjust_dynamic_range=self.adjust_dynamic_range)
-            self.sample_set = MelbourneZRGB(dataset=self.dataset_name, image_set="test", max_samples=self.sample_num, adjust_dynamic_range=self.adjust_dynamic_range)
-            self.eval_set   = MelbourneZRGB(dataset=self.dataset_name, image_set="test", max_samples=self.calculate_eval_samples, adjust_dynamic_range=self.adjust_dynamic_range)
+            self.train_set  = MelbourneZRGB(dataset=self.dataset_name, image_set="train", adjust_range=self.adjust_range)
+            self.sample_set = MelbourneZRGB(dataset=self.dataset_name, image_set="test", max_samples=self.sample_num, adjust_range=self.adjust_range)
+            self.eval_set   = MelbourneZRGB(dataset=self.dataset_name, image_set="test", max_samples=self.calculate_eval_samples, adjust_range=self.adjust_range)
         elif self.dataset_name == "maps":
-            self.train_set  = Maps(image_set="train", adjust_dynamic_range=self.adjust_dynamic_range)
-            self.sample_set = Maps(image_set="test", max_samples=self.sample_num, adjust_dynamic_range=self.adjust_dynamic_range)
-            self.eval_set   = Maps(image_set="test", max_samples=self.calculate_eval_samples, adjust_dynamic_range=self.adjust_dynamic_range)
+            self.train_set  = Maps(image_set="train", adjust_range=self.adjust_range)
+            self.sample_set = Maps(image_set="test", max_samples=self.sample_num, adjust_range=self.adjust_range)
+            self.eval_set   = Maps(image_set="test", max_samples=self.calculate_eval_samples, adjust_range=self.adjust_range)
         elif self.dataset_name == "graymaps":
-            self.train_set  = GrayMaps(image_set="train", adjust_dynamic_range=self.adjust_dynamic_range)
-            self.sample_set = GrayMaps(image_set="test", max_samples=self.sample_num, adjust_dynamic_range=self.adjust_dynamic_range)
-            self.eval_set   = GrayMaps(image_set="test", max_samples=self.calculate_eval_samples, adjust_dynamic_range=self.adjust_dynamic_range)
-        elif self.dataset_name == "estonia":
-            self.train_set  = EstoniaZRGB(dataset=self.dataset_name, image_set="train", adjust_dynamic_range=self.adjust_dynamic_range)
-            self.sample_set = EstoniaZRGB(dataset=self.dataset_name, image_set="test", max_samples=self.sample_num, adjust_dynamic_range=self.adjust_dynamic_range)
-            self.eval_set   = EstoniaZRGB(dataset=self.dataset_name, image_set="test", max_samples=self.calculate_eval_samples, adjust_dynamic_range=self.adjust_dynamic_range)
+            self.train_set  = GrayMaps(image_set="train", adjust_range=self.adjust_range)
+            self.sample_set = GrayMaps(image_set="test", max_samples=self.sample_num, adjust_range=self.adjust_range)
+            self.eval_set   = GrayMaps(image_set="test", max_samples=self.calculate_eval_samples, adjust_range=self.adjust_range)
+        elif self.dataset_name == "estonia-z":
+            self.train_set  = EstoniaZRGB(dataset=self.dataset_name, image_set="train", adjust_range=self.adjust_range)
+            self.sample_set = EstoniaZRGB(dataset=self.dataset_name, image_set="test", max_samples=self.sample_num, adjust_range=self.adjust_range)
+            self.eval_set   = EstoniaZRGB(dataset=self.dataset_name, image_set="test", max_samples=self.calculate_eval_samples, adjust_range=self.adjust_range)
+        elif self.dataset_name == "estonia-i":
+            self.train_set  = EstoniaIRGB(dataset=self.dataset_name, image_set="train", adjust_range=self.adjust_range)
+            self.sample_set = EstoniaIRGB(dataset=self.dataset_name, image_set="test", max_samples=self.sample_num, adjust_range=self.adjust_range)
+            self.eval_set   = EstoniaIRGB(dataset=self.dataset_name, image_set="test", max_samples=self.calculate_eval_samples, adjust_range=self.adjust_range)
+        elif self.dataset_name == "estonia-zi":
+            self.train_set  = EstoniaZIRGB(dataset=self.dataset_name, image_set="train", adjust_range=self.adjust_range)
+            self.sample_set = EstoniaZIRGB(dataset=self.dataset_name, image_set="test", max_samples=self.sample_num, adjust_range=self.adjust_range)
+            self.eval_set   = EstoniaZIRGB(dataset=self.dataset_name, image_set="test", max_samples=self.calculate_eval_samples, adjust_range=self.adjust_range)
         else:
             raise ValueError(f"Unknown dataset: {self.dataset_name}")
 
         self.dataloader = DataLoader(dataset=self.train_set, num_workers=self.threads, batch_size=self.batch_size, shuffle=True, drop_last=True)
         self.sample_dl = DataLoader(dataset=self.sample_set, num_workers=self.threads, batch_size=self.sample_num, shuffle=False, drop_last=True)
         self.eval_dl = DataLoader(dataset=self.sample_set, num_workers=self.threads, batch_size=self.calculate_eval_batch_size, shuffle=False, drop_last=True)
-        
+
     def save_configs(self):
         with open(self.model_dir / "configs.txt", "w") as f:
             f.write(str(self.__dict__))
@@ -257,8 +265,8 @@ class Trainer():
         for i, batch in enumerate(self.sample_dl):
             real_A = batch["A"].to(self.device)
             fake_B = self.G_AB(real_A)
-            if self.adjust_dynamic_range:
-                fake_B = adjust_dynamic_range(fake_B, (-1, 1), (0, 1))
+            if self.adjust_range:
+                fake_B = adjust_range(fake_B, (-1, 1), (0, 1))
             if grid:
                 fake_images = torch.cat((fake_images, fake_B), 0)
                 if epoch == 0:

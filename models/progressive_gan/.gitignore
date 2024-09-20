@@ -89,6 +89,7 @@ ENV/
 .ropeproject
 
 .aim/
+clean
 dataset/
 saved_models/
 saved_images

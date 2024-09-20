@@ -1,4 +1,5 @@
 import torch
+import string
 import random
 import numpy as np
 import seaborn as sns
@@ -38,7 +39,7 @@ def print_model_parameters(model):
         print(p)
 
 
-def adjust_dynamic_range(
+def adjust_range(
     data: Tensor,
     drange_in: Tuple[float, float] = (0.0, 1.0),
     drange_out: Tuple[float, float] = (-1.0, 1.0),
@@ -80,6 +81,10 @@ def init_weights(m, init_type='normal', init_gain=0.02):
             init.constant_(m.bias.data, 0.0)
 
     m.apply(init_func)
+
+
+def identifier():
+    return "".join(random.choices(string.ascii_letters + string.digits, k=5))
 
 # ----------------
 # Display debug functions
