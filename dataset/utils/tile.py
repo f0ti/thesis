@@ -1,5 +1,3 @@
-import os
-import stat
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -11,23 +9,22 @@ QUIET = True
 
 
 class Tile:
-
     def __init__(self, filename: str) -> None:
         self.filename: str = filename
         self.points = []
         self.read_points()
 
     @property
-    def rgb(self) -> List:
+    def RGB(self) -> List:
         return [(point.R, point.G, point.B) for point in self.points]
 
     @property
-    def intensities(self) -> List:
-        return [point.intensity for point in self.points]
+    def XYZ(self) -> List:
+        return [(point.X, point.Y, point.Z) for point in self.points]
 
     @property
-    def xyz(self) -> List:
-        return [(point.X, point.Y, point.Z) for point in self.points]
+    def I(self) -> List:
+        return [point.intensity for point in self.points]
 
     @property
     def X(self) -> List:
@@ -71,16 +68,7 @@ class Tile:
                 self.points.append(point)
 
     def show(self) -> None:
-        # search if tile name exists in imgs folder
-        img_name = self.filename.split("/")[-1]
-        try:
-            img = plt.imread(f"imgs/{img_name}.png")
-        except FileNotFoundError:
-            img = np.asarray(self.rgb, dtype=np.uint8).reshape(
-                self.width, self.height, 3
-            )
-
-        plt.imshow(img)
+        plt.imshow(np.asarray(self.RGB, dtype=np.uint8).reshape(self.width, self.height, 3))
         plt.show()
 
     @staticmethod
@@ -96,26 +84,24 @@ class Tile:
 
     @staticmethod
     def _scale_z(z: np.ndarray) -> np.ndarray:
-        z = np.clip(z, 0, None, dtype=np.float32)
-        z /= 50
-
+        z /= 50.0
         return np.clip(z, 0, 1, dtype=np.float32)
 
     @staticmethod
-    def _scale_rgb(img: np.ndarray) -> np.ndarray:
-        img /= 255
+    def _scale_255(img: np.ndarray) -> np.ndarray:
+        img /= 255.0
         return img
 
     def save_rgb(self, root) -> None:
-        img = np.asarray(self.rgb, dtype=np.float32).reshape(
+        img = np.asarray(self.RGB, dtype=np.float32).reshape(
             self.width, self.height, 3
         )
-        img = self._scale_rgb(img)
+        img = self._scale_255(img)
         img_name = self.filename.split("/")[-1]
         np.save(f"{root}/{img_name}.npy", img)
 
     def save_xyz(self, root) -> None:
-        xyz = np.asarray(self.xyz, dtype=np.float32).reshape(self.width, self.height, 3)
+        xyz = np.asarray(self.XYZ, dtype=np.float32).reshape(self.width, self.height, 3)
         xyz_name = self.filename.split("/")[-1]
         np.save(f"{root}/{xyz_name}.npy", xyz)
 
@@ -125,23 +111,20 @@ class Tile:
         np.save(f"{root}/{z_name}.npy", z)
 
     def save_i(self, root) -> None:
-        intensity = np.asarray(self.intensities, dtype=np.float32).reshape(
-            self.width, self.height, 1
-        )
+        i = np.asarray(self.I, dtype=np.float32).reshape(self.width, self.height, 1)
+        i = self._scale_255(i)
         i_name = self.filename.split("/")[-1]
-        np.save(f"{root}/{i_name}.npy", intensity)
+        np.save(f"{root}/{i_name}.npy", i)
 
     def save_zi(self, root) -> None:
         z = np.asarray(self.Z, dtype=np.float32).reshape(self.width, self.height, 1)
-        intensity = np.asarray(self.intensities, dtype=np.float32).reshape(
-            self.width, self.height, 1
-        )
-        z_intensity = np.concatenate((z, intensity), axis=2)
-        z_intensity_name = self.filename.split("/")[-1]
-        np.save(f"{root}/{z_intensity_name}.npy", z_intensity)
+        i = np.asarray(self.I, dtype=np.float32).reshape(self.width, self.height, 1)
+        i = self._scale_255(i)
+        z_i = np.concatenate((z, i), axis=2)
+        z_i_name = self.filename.split("/")[-1]
+        np.save(f"{root}/{z_i_name}.npy", z_i)
 
     def save_dtm(self, root) -> None:
-        Z = np.asarray(self.Z, dtype=np.float64).reshape(self.width, self.height, 1)
-        Z = np.clip(Z, 0, 50, dtype=np.float16)
+        z_dtm = np.asarray(self.Z, dtype=np.float32).reshape(self.width, self.height, 1)
         dtm_name = self.filename.split("/")[-1]
-        np.save(f"{root}/{dtm_name}.npy", Z)
+        np.save(f"{root}/{dtm_name}.npy", z_dtm)

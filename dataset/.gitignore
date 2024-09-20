@@ -1,7 +1,7 @@
 melbourne*/
+maps/
+estonia*/
+filtered_out*/
 utils/experiment.py
 *.pt
 *.txt
-filtered_out*/
-maps/
-estonia/

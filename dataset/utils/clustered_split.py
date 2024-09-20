@@ -67,7 +67,7 @@ class ImageHistogramClustering:
     
     def show_cluster_images(self, cluster):
         paths = [path for path, label in zip(self.paths, self.model.labels_) if label == cluster][:10]
-        fig, axs = plt.subplots(1, len(paths))
+        _, axs = plt.subplots(1, len(paths))
         for i, path in enumerate(paths):
             img = np.load(os.path.join(self.rgb_dir, path))
             axs[i].imshow(img)
@@ -80,7 +80,7 @@ class Splitter():
         self.root = f"../{dataset_name}"
         self.split_ratio = split_ratio
         self.clusters = clusters
-        self.data_type = data_type
+        self.data_type = f"{data_type}_data"
         self.n_clusters = n_clusters
         self.del_artifacts = del_artifacts
 
@@ -116,9 +116,9 @@ class Splitter():
 
 if __name__ == "__main__":
     dataset_name = sys.argv[1]
-    data_type = "zi_data"
+    data_type = sys.argv[2]
     cluster_model = ImageHistogramClustering(dataset_name, n_clusters=2)
     clusters = cluster_model.cluster()
 
-    splitter = Splitter(dataset_name=dataset_name, data_type=data_type, n_clusters=2, clusters=clusters, split_ratio=0.8, del_artifacts=False)
+    splitter = Splitter(dataset_name=dataset_name, data_type=data_type, n_clusters=2, clusters=clusters, split_ratio=0.8, del_artifacts=True)
     splitter.split()
