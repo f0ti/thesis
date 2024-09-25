@@ -17,9 +17,9 @@ load_dotenv()
 class Sampler():
     def __init__(
         self,
-        run_name: str = "2024-09-19_20-20-04_estonia_resnet9",
+        run_name: str = "2024-09-21_12-25-44_graymaps_resnet9",
         model_epoch: str = "42",
-        dataset_name: str = "estonia",
+        dataset_name: str = "estonia-z",
         threads: int = 8,
         generator_type: str = "resnet9",
         generator_mode: str = "AB",
@@ -93,8 +93,12 @@ class Sampler():
             self.sample_set = Maps(image_set="test", max_samples=self.num_samples)
         elif self.dataset_name == "graymaps":
             self.sample_set = GrayMaps(image_set="test", max_samples=self.num_samples)
-        elif self.dataset_name == "estonia":
+        elif self.dataset_name == "estonia-z":
             self.sample_set = EstoniaZRGB(image_set="test", max_samples=self.num_samples)
+        elif self.dataset_name == "estonia-i":
+            self.sample_set = EstoniaIRGB(image_set="test", max_samples=self.num_samples)
+        elif self.dataset_name == "estonia-zi":
+            self.sample_set = EstoniaZIRGB(image_set="test", max_samples=self.num_samples)
         else:
             raise ValueError(f"Unknown dataset: {self.dataset_name}")
 

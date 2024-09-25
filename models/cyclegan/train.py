@@ -22,11 +22,12 @@ class Trainer():
         base_dir = ".",
         model_dir = "saved_models",
         image_dir = "saved_images",
-        load_from_model_dir: str = "2024-09-19_20-20-04_estonia_resnet9",
-        load_from_model_epoch: int = 48,
+        load_from_model_dir: str = "",
+        load_from_model_epoch: int = 0,
+        adjust_model_shape: bool = True,
         epochs: int = 10,
-        epochs_decay: int = 20,
-        dataset_name: str = "estonia-i",
+        epochs_decay: int = 40,
+        dataset_name: str = "graymaps",
         image_size: int = 256,
         input_image_channel: int = 1,
         target_image_channel: int = 3,
@@ -44,7 +45,7 @@ class Trainer():
         sample_grid: bool = True,
         save_every: int = 2,
         loss_fns: list = ["gan", "cycle", "identity", "ssim", "tv"],
-        loss_weights: list = [10.0, 10.0, 0.5, 5.0, 2.0],
+        loss_weights: list = [1.0, 10.0, 0.5, 5.0, 2.0],
         eval_fid: bool = True,
         eval_is: bool = False,
         calculate_eval_every: int = 2,
@@ -52,17 +53,21 @@ class Trainer():
         calculate_eval_batch_size: int = 8,
         pool_size: int = 50,
     ):
-        self.name = f"{str(datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))}_{dataset_name}_{generator_type}"
+        date_now = str(datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))
+        self.name = f"{date_now}_{dataset_name}_{generator_type}"
 
         base_dir = Path(base_dir)
         self.model_dir = base_dir / model_dir / self.name
         self.image_dir = base_dir / image_dir / self.name
         self.eval_dir = base_dir / 'eval' / self.name
-        if load_from_model_dir:
-            self.load_from_model_dir = base_dir / model_dir / load_from_model_dir
-            self.load_from_model_epoch = load_from_model_epoch
+        self.load_from_model_dir = None
+        self.load_from_model_epoch = load_from_model_epoch
+        if self.load_from_model_dir:
+            self.load_from_model_dir = base_dir / model_dir / self.load_from_model_dir
+            self.load_from_model_epoch = self.load_from_model_epoch
             print("Loading from model directory:", self.load_from_model_dir)
         self.init_folders()
+        self.adjust_model_shape = adjust_model_shape
 
         self.total_epochs = epochs + epochs_decay
         self.epochs = epochs
@@ -136,8 +141,8 @@ class Trainer():
             raise ValueError(f"Unknown generator type: {self.generator_type}")
 
         if self.load_from_model_dir:
-            self.G_AB.load_state_dict(torch.load(self.load_from_model_dir / f"G_AB_{self.load_from_model_epoch}.pth"))
-            self.G_BA.load_state_dict(torch.load(self.load_from_model_dir / f"G_BA_{self.load_from_model_epoch}.pth"))
+            self.load_model(self.G_AB, self.load_from_model_dir / f"G_AB_{self.load_from_model_epoch}.pth", "G_AB")
+            self.load_model(self.G_BA, self.load_from_model_dir / f"G_BA_{self.load_from_model_epoch}.pth", "G_BA")
             print(f"Loaded generators from {self.load_from_model_dir}")
         else:
             init_weights(self.G_AB)
@@ -148,8 +153,8 @@ class Trainer():
         self.D_B = PatchDiscriminator(self.target_image_channel).to(self.device)
 
         if self.load_from_model_dir:
-            self.D_A.load_state_dict(torch.load(self.load_from_model_dir / f"D_A_{self.load_from_model_epoch}.pth"))
-            self.D_B.load_state_dict(torch.load(self.load_from_model_dir / f"D_B_{self.load_from_model_epoch}.pth"))
+            self.load_model(self.D_A, self.load_from_model_dir / f"D_A_{self.load_from_model_epoch}.pth", "D_A")
+            self.load_model(self.D_B, self.load_from_model_dir / f"D_B_{self.load_from_model_epoch}.pth", "D_B")
             print(f"Loaded discriminators from {self.load_from_model_dir}")
         else:
             init_weights(self.D_A)
@@ -173,12 +178,13 @@ class Trainer():
     def init_losses(self):
         self.criterion_GAN = torch.nn.MSELoss()
         self.criterion_cycle = torch.nn.L1Loss()
-        self.criterion_identity = torch.nn.L1Loss()
+        self.kl_loss = torch.nn.KLDivLoss()
+        # self.criterion_identity = torch.nn.L1Loss()
         # self.criterion_ssim = SSIMLoss().to(self.device)
         # self.criterion_tv = TVLoss().to(self.device)
         self.lambda_GAN = self.loss_weights[self.loss_fns.index("gan")]
         self.lambda_cycle = self.loss_weights[self.loss_fns.index("cycle")]
-        self.lambda_identity = self.loss_weights[self.loss_fns.index("identity")]
+        # self.lambda_identity = self.loss_weights[self.loss_fns.index("identity")]
         # self.lambda_ssim = self.loss_weights[self.loss_fns.index("ssim")]
         # self.lambda_tv = self.loss_weights[self.loss_fns.index("tv")]
 
@@ -187,7 +193,7 @@ class Trainer():
         self.fake_A_buffer = ReplayBuffer(self.pool_size)
         self.fake_B_buffer = ReplayBuffer(self.pool_size)
 
-    def set_data_src(self):
+    def init_data(self):
         if self.dataset_name == "melbourne-top":
             self.train_set  = MelbourneXYZRGB(dataset=self.dataset_name, image_set="train")
             self.sample_set = MelbourneXYZRGB(dataset=self.dataset_name, image_set="test", max_samples=self.sample_num)
@@ -201,7 +207,7 @@ class Trainer():
             self.sample_set = Maps(image_set="test", max_samples=self.sample_num, adjust_range=self.adjust_range)
             self.eval_set   = Maps(image_set="test", max_samples=self.calculate_eval_samples, adjust_range=self.adjust_range)
         elif self.dataset_name == "graymaps":
-            self.train_set  = GrayMaps(image_set="train", adjust_range=self.adjust_range)
+            self.train_set  = GrayMaps(image_set="train+test", adjust_range=self.adjust_range)
             self.sample_set = GrayMaps(image_set="test", max_samples=self.sample_num, adjust_range=self.adjust_range)
             self.eval_set   = GrayMaps(image_set="test", max_samples=self.calculate_eval_samples, adjust_range=self.adjust_range)
         elif self.dataset_name == "estonia-z":
@@ -222,6 +228,29 @@ class Trainer():
         self.dataloader = DataLoader(dataset=self.train_set, num_workers=self.threads, batch_size=self.batch_size, shuffle=True, drop_last=True)
         self.sample_dl = DataLoader(dataset=self.sample_set, num_workers=self.threads, batch_size=self.sample_num, shuffle=False, drop_last=True)
         self.eval_dl = DataLoader(dataset=self.sample_set, num_workers=self.threads, batch_size=self.calculate_eval_batch_size, shuffle=False, drop_last=True)
+
+    def load_model(self, model, model_dir, model_name):
+        loaded_model = torch.load(model_dir)
+        if self.adjust_model_shape:
+            if model_name == "G_AB":    # if model is G_AB duplicate model.1.weight
+                loaded_model['model.1.weight'] = torch.cat((loaded_model['model.1.weight'], loaded_model['model.1.weight']), 1)
+                self.match_weights(model, loaded_model, model_name, 1)
+            elif model_name == "G_BA":  # if model is G_BA duplicate model.26.weight 
+                loaded_model['model.26.weight'] = torch.cat((loaded_model['model.26.weight'], loaded_model['model.26.weight']), 1)
+                self.match_weights(model, loaded_model, model_name, 1)
+            elif model_name == "D_A":   # if model is D_A duplicate model.0.weight
+                loaded_model['model.0.weight'] = torch.cat((loaded_model['model.0.weight'], loaded_model['model.0.weight']), 1)
+                self.match_weights(model, loaded_model, model_name, 0)
+            else:  # if model is D_B just load the model
+                model.load_state_dict(loaded_model)
+        else:
+            model.load_state_dict(loaded_model)
+
+    def match_weights(self, model, loaded_model, model_name, idx):
+        if model.state_dict()[f'model.{idx}.weight'].shape == loaded_model[f'model.{idx}.weight'].shape:
+            print(f"Model {model_name} input layers now match")
+            return True
+        return False
 
     def save_configs(self):
         with open(self.model_dir / "configs.txt", "w") as f:
@@ -284,7 +313,7 @@ class Trainer():
         self.G_AB.train()
     
     def calculate_eval(self, epoch):
-        def eval_step(engine, batch):
+        def eval_step(_, batch):
             return batch
 
         default_evaluator = Engine(eval_step)
@@ -322,7 +351,7 @@ class Trainer():
     def train(self):
         print(f"Starting training {self.name}")
         self.init_GAN()
-        self.set_data_src()
+        self.init_data()
         self.save_configs()
         self._toggle_networks("train")
 
@@ -360,8 +389,11 @@ class Trainer():
                 loss_cycle_B = self.criterion_cycle(recov_B, real_B)
                 loss_cycle = (loss_cycle_A + loss_cycle_B) * 0.5
 
+                # KL Divergence loss
+                # loss_kl = self.kl_loss(fake_A, real_A)  # do it only for AtoB
+
                 # Total Variation loss
-                # loss_tv = self.criterion_tv(fake_A)  # do it only for A>B
+                # loss_tv = self.criterion_tv(fake_A)  # do it only for AtoB
 
                 # Structural Similarity loss
                 # loss_ssim_G_A = self.criterion_ssim(fake_A, real_A)
@@ -369,8 +401,9 @@ class Trainer():
                 # loss_ssim = (loss_ssim_G_A + loss_ssim_G_B) * 0.5
 
                 # Total loss (generator)
-                loss_G =  loss_adv_G
+                loss_G =  self.lambda_GAN * loss_adv_G
                 loss_G += self.lambda_cycle * loss_cycle
+                # loss_G += self.lambda_kl * loss_kl
                 # loss_G += self.lambda_ssim * loss_ssim
                 # loss_G += self.lambda_identity * loss_identity
                 # loss_G += loss_tv * self.lambda_tv
