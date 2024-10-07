@@ -6,9 +6,9 @@ from tile import Tile
 
 class DataExtractor():
     def __init__(self, dataset: str, data_type: list) -> None:
-        assert dataset in ["melbourne-top", "melbourne-z-top", "estonia", "estonia-staging"]
+        assert dataset in ["melbourne-top", "melbourne-z-top", "estonia", "estonia-z", "estonia-i", "estonia-zi"]
         self.dataset = dataset
-        if self.dataset in ["estonia", "estonia-staging"]:
+        if self.dataset.startswith("estonia"):
             self.tile_bytesize = 2228236
         else:
             self.tile_bytesize = 2162700
