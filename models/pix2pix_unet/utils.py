@@ -68,3 +68,17 @@ def show_diff(ground_truth, predicted, cols=4, figsize=(20, 20)):
 def print_weights(model):
     for name, param in model.named_parameters():
         print(name, param)
+
+def adjust_range(
+    data: Tensor,
+    drange_in: Tuple[float, float] = (0.0, 1.0),
+    drange_out: Tuple[float, float] = (-1.0, 1.0),
+):
+    if drange_in != drange_out:
+        scale = (np.float32(drange_out[1]) - np.float32(drange_out[0])) / (
+            np.float32(drange_in[1]) - np.float32(drange_in[0])
+        )
+        bias = np.float32(drange_out[0]) - np.float32(drange_in[0]) * scale
+        data = data * scale + bias
+
+    return torch.clamp(data, min=drange_out[0], max=drange_out[1])
