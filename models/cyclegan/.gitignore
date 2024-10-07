@@ -88,13 +88,15 @@ ENV/
 # Rope project settings
 .ropeproject
 
+update_dsri.sh
 dataset/
 wandb/
 saved_models/
 saved_images/
 saved_gifs/
 sampled_images/
-fid/
+eval/
 clean
 models_vault/
-.aim/*
+.aim/
+dsri_aim/

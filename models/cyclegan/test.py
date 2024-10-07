@@ -1,7 +1,6 @@
 import os
 import fire
 import torch
-import string
 
 from pathlib import Path
 from torch.utils.data import DataLoader
@@ -67,16 +66,11 @@ class Sampler():
                 self.gen = GeneratorResNet(self.input_channel, self.target_channel, n_blocks=9).to(self.device)
             else:
                 self.gen = GeneratorResNet(self.target_channel, self.input_channel, n_blocks=9).to(self.device)
-        elif self.generator_type == "unet_upconv":
+        elif self.generator_type == "unet":
             if self.generator_mode == "AB":
-                self.gen = GeneratorUNet(self.input_channel, self.target_channel, 8, upsample=False).to(self.device)
+                self.gen = GeneratorUNet(self.input_channel, self.target_channel, num_downs=8).to(self.device)
             else:
-                self.gen = GeneratorUNet(self.target_channel, self.input_channel, 8, upsample=False).to(self.device)
-        elif self.generator_type == "unet_upsample":
-            if self.generator_mode == "AB":
-                self.gen = GeneratorUNet(self.input_channel, self.target_channel, 8, upsample=True).to(self.device)
-            else:
-                self.gen = GeneratorUNet(self.target_channel, self.input_channel, 8, upsample=True).to(self.device)
+                self.gen = GeneratorUNet(self.target_channel, self.input_channel, num_downs=8).to(self.device)
         else:
             raise ValueError(f"Unknown generator type: {self.generator_type}")
 
@@ -90,9 +84,9 @@ class Sampler():
         elif self.dataset_name == "melbourne-z-top":
             self.sample_set = MelbourneZRGB(image_set="test", max_samples=self.num_samples)
         elif self.dataset_name == "maps":
-            self.sample_set = Maps(image_set="test", max_samples=self.num_samples)
+            self.sample_set = Maps(dataset="maps", image_set="test", max_samples=self.num_samples)
         elif self.dataset_name == "graymaps":
-            self.sample_set = GrayMaps(image_set="test", max_samples=self.num_samples)
+            self.sample_set = Maps(dataset="graymaps", image_set="test", max_samples=self.num_samples)
         elif self.dataset_name == "estonia-z":
             self.sample_set = EstoniaZRGB(image_set="test", max_samples=self.num_samples)
         elif self.dataset_name == "estonia-i":

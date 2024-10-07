@@ -10,6 +10,7 @@ import torchvision.transforms.functional as F
 from typing import Tuple
 from torch import Tensor
 from torch.optim import lr_scheduler
+from kornia.color import lab_to_rgb, rgb_to_lab
 
 
 class ReplayBuffer:
@@ -155,3 +156,21 @@ def show_diff(ground_truth, predicted, cols=4, figsize=(20, 20)):
         ax.axis('off')
     plt.tight_layout()
     plt.show()
+
+def rgb2lab(img):
+    lab_img = rgb_to_lab(img)
+    # Lab version of the image with shape. The L channel values are in the range 0..100. a and b are in the range -128..127.
+    # normalize the L channel to 0-1, and a, b to 0-1
+    lab_img[0, :, :] =  lab_img[0, :, :] / 100.0
+    lab_img[1, :, :] = (lab_img[1, :, :] + 128) / 255.0
+    lab_img[2, :, :] = (lab_img[2, :, :] + 128) / 255.0
+
+    return lab_img
+
+def lab2rgb(img):
+    rgb_image = lab_to_rgb(img)
+    rgb_image[0, :, :] = rgb_image[0, :, :] * 100.0
+    rgb_image[1, :, :] = rgb_image[1, :, :] * 255.0 - 128
+    rgb_image[2, :, :] = rgb_image[2, :, :] * 255.0 - 128
+
+    return rgb_image 

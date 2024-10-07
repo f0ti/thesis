@@ -16,7 +16,7 @@ from model import *
 from loss import *
 from data import *
 
-class Trainer():
+class Trainer:
     def __init__(
         self,
         base_dir = ".",
@@ -24,15 +24,16 @@ class Trainer():
         image_dir = "saved_images",
         load_from_model_dir: str = "",
         load_from_model_epoch: int = 0,
-        adjust_model_shape: bool = True,
-        epochs: int = 10,
-        epochs_decay: int = 40,
+        adjust_model_shape: bool = False,
+        epochs: int = 15,
+        epochs_decay: int = 35,
         dataset_name: str = "graymaps",
         image_size: int = 256,
         input_image_channel: int = 1,
         target_image_channel: int = 3,
-        adjust_range: bool = False,
+        adjust_range: bool = True,
         generator_type: str = "resnet9",
+        use_dropout: bool = False,
         batch_size: int = 2,
         lr_gen = 2e-4,
         lr_disc = 2e-4,
@@ -45,12 +46,12 @@ class Trainer():
         sample_grid: bool = True,
         save_every: int = 2,
         loss_fns: list = ["gan", "cycle", "identity", "ssim", "tv"],
-        loss_weights: list = [1.0, 10.0, 0.5, 5.0, 2.0],
+        loss_weights: list = [1.0, 10.0, 0.5, 1.0, 2.0],
         eval_fid: bool = True,
         eval_is: bool = False,
-        calculate_eval_every: int = 2,
-        calculate_eval_samples: int = 2000,
-        calculate_eval_batch_size: int = 8,
+        eval_every: int = 2,
+        eval_samples: int = 2000,
+        eval_batch_size: int = 8,
         pool_size: int = 50,
     ):
         date_now = str(datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S'))
@@ -61,10 +62,9 @@ class Trainer():
         self.image_dir = base_dir / image_dir / self.name
         self.eval_dir = base_dir / 'eval' / self.name
         self.load_from_model_dir = None
-        self.load_from_model_epoch = load_from_model_epoch
-        if self.load_from_model_dir:
-            self.load_from_model_dir = base_dir / model_dir / self.load_from_model_dir
-            self.load_from_model_epoch = self.load_from_model_epoch
+        if load_from_model_dir:
+            self.load_from_model_dir = base_dir / model_dir / load_from_model_dir
+            self.load_from_model_epoch = load_from_model_epoch
             print("Loading from model directory:", self.load_from_model_dir)
         self.init_folders()
         self.adjust_model_shape = adjust_model_shape
@@ -81,6 +81,7 @@ class Trainer():
         self.b2 = b2
         self.threads = threads
         self.generator_type = generator_type
+        self.use_dropout = use_dropout
         self.pool_size = pool_size
         
         self.loss_fns = loss_fns
@@ -92,9 +93,9 @@ class Trainer():
         
         self.save_every = save_every
 
-        self.calculate_eval_every = calculate_eval_every
-        self.calculate_eval_samples = calculate_eval_samples
-        self.calculate_eval_batch_size = calculate_eval_batch_size
+        self.eval_every = eval_every
+        self.eval_samples = eval_samples
+        self.eval_batch_size = eval_batch_size
         self.eval_fid = eval_fid
         self.eval_is = eval_is
         assert (self.eval_fid or self.eval_is), "At least one of FID or IS should be enabled"
@@ -105,7 +106,7 @@ class Trainer():
         self.adjust_range = adjust_range
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.logger = aim.Run()
+        self.logger = aim.Run(log_system_params=True)
     
     def init_GAN(self):
         # Models
@@ -126,21 +127,22 @@ class Trainer():
 
     def init_generator(self):
         if self.generator_type == "resnet6":
-            self.G_AB = GeneratorResNet(self.input_image_channel, self.target_image_channel, n_blocks=6).to(self.device)
-            self.G_BA = GeneratorResNet(self.target_image_channel, self.input_image_channel, n_blocks=6).to(self.device)
+            self.G_AB = GeneratorResNet(self.input_image_channel, self.target_image_channel, n_blocks=6, use_dropout=self.use_dropout).to(self.device)
+            self.G_BA = GeneratorResNet(self.target_image_channel, self.input_image_channel, n_blocks=6, use_dropout=self.use_dropout).to(self.device)
         elif self.generator_type == "resnet9":
-            self.G_AB = GeneratorResNet(self.input_image_channel, self.target_image_channel, n_blocks=9).to(self.device)
-            self.G_BA = GeneratorResNet(self.target_image_channel, self.input_image_channel, n_blocks=9).to(self.device)
-        elif self.generator_type == "unet_upconv":
-            self.G_AB = GeneratorUNet(self.input_image_channel, self.target_image_channel, 8, upsample=False).to(self.device)
-            self.G_BA = GeneratorUNet(self.target_image_channel, self.input_image_channel, 8, upsample=False).to(self.device)
-        elif self.generator_type == "unet_upsample":
-            self.G_AB = GeneratorUNet(self.input_image_channel, self.target_image_channel, 8, upsample=True).to(self.device)
-            self.G_BA = GeneratorUNet(self.target_image_channel, self.input_image_channel, 8, upsample=True).to(self.device)
+            self.G_AB = GeneratorResNet(self.input_image_channel, self.target_image_channel, n_blocks=9, use_dropout=self.use_dropout).to(self.device)
+            self.G_BA = GeneratorResNet(self.target_image_channel, self.input_image_channel, n_blocks=9, use_dropout=self.use_dropout).to(self.device)
+        elif self.generator_type == "resnet18":
+            self.G_AB = GeneratorResNet(self.input_image_channel, self.target_image_channel, n_blocks=18, use_dropout=self.use_dropout).to(self.device)
+            self.G_BA = GeneratorResNet(self.target_image_channel, self.input_image_channel, n_blocks=18, use_dropout=self.use_dropout).to(self.device)
+        elif self.generator_type == "unet":
+            self.G_AB = GeneratorUNet(self.input_image_channel, self.target_image_channel, num_downs=8).to(self.device)
+            self.G_BA = GeneratorUNet(self.target_image_channel, self.input_image_channel, num_downs=8).to(self.device)
         else:
             raise ValueError(f"Unknown generator type: {self.generator_type}")
 
         if self.load_from_model_dir:
+            print("Loading models from", self.load_from_model_dir)
             self.load_model(self.G_AB, self.load_from_model_dir / f"G_AB_{self.load_from_model_epoch}.pth", "G_AB")
             self.load_model(self.G_BA, self.load_from_model_dir / f"G_BA_{self.load_from_model_epoch}.pth", "G_BA")
             print(f"Loaded generators from {self.load_from_model_dir}")
@@ -178,7 +180,6 @@ class Trainer():
     def init_losses(self):
         self.criterion_GAN = torch.nn.MSELoss()
         self.criterion_cycle = torch.nn.L1Loss()
-        self.kl_loss = torch.nn.KLDivLoss()
         # self.criterion_identity = torch.nn.L1Loss()
         # self.criterion_ssim = SSIMLoss().to(self.device)
         # self.criterion_tv = TVLoss().to(self.device)
@@ -197,41 +198,38 @@ class Trainer():
         if self.dataset_name == "melbourne-top":
             self.train_set  = MelbourneXYZRGB(dataset=self.dataset_name, image_set="train")
             self.sample_set = MelbourneXYZRGB(dataset=self.dataset_name, image_set="test", max_samples=self.sample_num)
-            self.eval_set   = MelbourneXYZRGB(dataset=self.dataset_name, image_set="test", max_samples=self.calculate_eval_samples)
+            self.eval_set   = MelbourneXYZRGB(dataset=self.dataset_name, image_set="test", max_samples=self.eval_samples)
         elif self.dataset_name == "melbourne-z-top":
             self.train_set  = MelbourneZRGB(dataset=self.dataset_name, image_set="train", adjust_range=self.adjust_range)
             self.sample_set = MelbourneZRGB(dataset=self.dataset_name, image_set="test", max_samples=self.sample_num, adjust_range=self.adjust_range)
-            self.eval_set   = MelbourneZRGB(dataset=self.dataset_name, image_set="test", max_samples=self.calculate_eval_samples, adjust_range=self.adjust_range)
-        elif self.dataset_name == "maps":
-            self.train_set  = Maps(image_set="train", adjust_range=self.adjust_range)
-            self.sample_set = Maps(image_set="test", max_samples=self.sample_num, adjust_range=self.adjust_range)
-            self.eval_set   = Maps(image_set="test", max_samples=self.calculate_eval_samples, adjust_range=self.adjust_range)
-        elif self.dataset_name == "graymaps":
-            self.train_set  = GrayMaps(image_set="train+test", adjust_range=self.adjust_range)
-            self.sample_set = GrayMaps(image_set="test", max_samples=self.sample_num, adjust_range=self.adjust_range)
-            self.eval_set   = GrayMaps(image_set="test", max_samples=self.calculate_eval_samples, adjust_range=self.adjust_range)
+            self.eval_set   = MelbourneZRGB(dataset=self.dataset_name, image_set="test", max_samples=self.eval_samples, adjust_range=self.adjust_range)
+        elif self.dataset_name in ["maps", "graymaps"]:
+            self.train_set  = Maps(dataset=self.dataset_name, image_set="train", adjust_range=self.adjust_range)
+            self.sample_set = Maps(dataset=self.dataset_name, image_set="test", max_samples=self.sample_num, adjust_range=self.adjust_range)
+            self.eval_set   = Maps(dataset=self.dataset_name, image_set="test", max_samples=self.eval_samples, adjust_range=self.adjust_range)
         elif self.dataset_name == "estonia-z":
             self.train_set  = EstoniaZRGB(dataset=self.dataset_name, image_set="train", adjust_range=self.adjust_range)
             self.sample_set = EstoniaZRGB(dataset=self.dataset_name, image_set="test", max_samples=self.sample_num, adjust_range=self.adjust_range)
-            self.eval_set   = EstoniaZRGB(dataset=self.dataset_name, image_set="test", max_samples=self.calculate_eval_samples, adjust_range=self.adjust_range)
+            self.eval_set   = EstoniaZRGB(dataset=self.dataset_name, image_set="test", max_samples=self.eval_samples, adjust_range=self.adjust_range)
         elif self.dataset_name == "estonia-i":
             self.train_set  = EstoniaIRGB(dataset=self.dataset_name, image_set="train", adjust_range=self.adjust_range)
             self.sample_set = EstoniaIRGB(dataset=self.dataset_name, image_set="test", max_samples=self.sample_num, adjust_range=self.adjust_range)
-            self.eval_set   = EstoniaIRGB(dataset=self.dataset_name, image_set="test", max_samples=self.calculate_eval_samples, adjust_range=self.adjust_range)
+            self.eval_set   = EstoniaIRGB(dataset=self.dataset_name, image_set="test", max_samples=self.eval_samples, adjust_range=self.adjust_range)
         elif self.dataset_name == "estonia-zi":
             self.train_set  = EstoniaZIRGB(dataset=self.dataset_name, image_set="train", adjust_range=self.adjust_range)
             self.sample_set = EstoniaZIRGB(dataset=self.dataset_name, image_set="test", max_samples=self.sample_num, adjust_range=self.adjust_range)
-            self.eval_set   = EstoniaZIRGB(dataset=self.dataset_name, image_set="test", max_samples=self.calculate_eval_samples, adjust_range=self.adjust_range)
+            self.eval_set   = EstoniaZIRGB(dataset=self.dataset_name, image_set="test", max_samples=self.eval_samples, adjust_range=self.adjust_range)
         else:
             raise ValueError(f"Unknown dataset: {self.dataset_name}")
 
         self.dataloader = DataLoader(dataset=self.train_set, num_workers=self.threads, batch_size=self.batch_size, shuffle=True, drop_last=True)
         self.sample_dl = DataLoader(dataset=self.sample_set, num_workers=self.threads, batch_size=self.sample_num, shuffle=False, drop_last=True)
-        self.eval_dl = DataLoader(dataset=self.sample_set, num_workers=self.threads, batch_size=self.calculate_eval_batch_size, shuffle=False, drop_last=True)
+        self.eval_dl = DataLoader(dataset=self.sample_set, num_workers=self.threads, batch_size=self.eval_batch_size, shuffle=False, drop_last=True)
 
     def load_model(self, model, model_dir, model_name):
         loaded_model = torch.load(model_dir)
         if self.adjust_model_shape:
+            print("Adjusting model shape")
             if model_name == "G_AB":    # if model is G_AB duplicate model.1.weight
                 loaded_model['model.1.weight'] = torch.cat((loaded_model['model.1.weight'], loaded_model['model.1.weight']), 1)
                 self.match_weights(model, loaded_model, model_name, 1)
@@ -279,13 +277,14 @@ class Trainer():
         for scheduler in self.schedulers:
                 scheduler.step()
         lr = self.optimizers[0].param_groups[0]['lr']
+        self.logger.track(lr, "learning_rate")
         print('learning rate %.5f -> %.5f' % (old_lr, lr))
 
     def save_model(self, epoch):
-        torch.save(self.G_AB.state_dict(), os.path.join(self.model_dir, f"G_AB_{epoch}.pth"))
-        torch.save(self.G_BA.state_dict(), os.path.join(self.model_dir, f"G_BA_{epoch}.pth"))
-        torch.save(self.D_A.state_dict(), os.path.join(self.model_dir, f"D_A_{epoch}.pth"))
-        torch.save(self.D_B.state_dict(), os.path.join(self.model_dir, f"D_B_{epoch}.pth"))
+        torch.save(self.G_AB.state_dict(), os.path.join(self.model_dir, f"G_AB_{str(epoch).zfill(2)}.pth"))
+        torch.save(self.G_BA.state_dict(), os.path.join(self.model_dir, f"G_BA_{str(epoch).zfill(2)}.pth"))
+        torch.save(self.D_A.state_dict(), os.path.join(self.model_dir, f"D_A_{str(epoch).zfill(2)}.pth"))
+        torch.save(self.D_B.state_dict(), os.path.join(self.model_dir, f"D_B_{str(epoch).zfill(2)}.pth"))
     
     def sample_images(self, epoch, sample_num, grid=True):
         self.G_AB.eval()
@@ -301,14 +300,14 @@ class Trainer():
                 if epoch == 0:
                     real_images = torch.cat((real_images, batch["B"].to(self.device)), 0)
             else:
-                save_image(fake_B, os.path.join(self.image_dir, f"fake_B_{epoch}_{sample_num}_{i}.png"))
+                save_image(fake_B, os.path.join(self.image_dir, f"fake_B_{str(epoch).zfill(4)}_{sample_num}_{i}.png"))
 
         if grid:
             fake_grid = make_grid(fake_images, nrow=3, normalize=True)
             if epoch == 0:
                 real_grid = make_grid(real_images, nrow=3, normalize=True)
-                save_image(real_grid, os.path.join(self.image_dir, f"real_B_{epoch}_{sample_num}.png"))
-            save_image(fake_grid, os.path.join(self.image_dir, f"fake_B_{epoch}_{sample_num}.png"))
+                save_image(real_grid, os.path.join(self.image_dir, f"real_B_{str(epoch).zfill(4)}_{sample_num}.png"))
+            save_image(fake_grid, os.path.join(self.image_dir, f"fake_B_{str(epoch).zfill(4)}_{sample_num}.png"))
 
         self.G_AB.train()
     
@@ -340,7 +339,7 @@ class Trainer():
 
         # write to file
         with open(self.eval_dir / "evals.txt", "a") as f:
-            f.write(f"Epoch: {epoch}, FID: {self.fid}, IS: {self.is_score}\n")
+            f.write(f"Epoch: {str(epoch).zfill(2)}, FID: {self.fid}, IS: {self.is_score}\n")
 
     def _zero_grad(self):
         self.optim_G_AB.zero_grad()
@@ -389,9 +388,6 @@ class Trainer():
                 loss_cycle_B = self.criterion_cycle(recov_B, real_B)
                 loss_cycle = (loss_cycle_A + loss_cycle_B) * 0.5
 
-                # KL Divergence loss
-                # loss_kl = self.kl_loss(fake_A, real_A)  # do it only for AtoB
-
                 # Total Variation loss
                 # loss_tv = self.criterion_tv(fake_A)  # do it only for AtoB
 
@@ -403,7 +399,6 @@ class Trainer():
                 # Total loss (generator)
                 loss_G =  self.lambda_GAN * loss_adv_G
                 loss_G += self.lambda_cycle * loss_cycle
-                # loss_G += self.lambda_kl * loss_kl
                 # loss_G += self.lambda_ssim * loss_ssim
                 # loss_G += self.lambda_identity * loss_identity
                 # loss_G += loss_tv * self.lambda_tv
@@ -458,7 +453,7 @@ class Trainer():
                     )
                 )
             
-            if self.calculate_eval_every and epoch % self.calculate_eval_every == 0 and epoch != 0:
+            if self.eval_every and epoch % self.eval_every == 0 and epoch != 0:
                 self.calculate_eval(epoch)
 
             self.update_learning_rate()
