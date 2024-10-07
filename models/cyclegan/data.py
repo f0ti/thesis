@@ -53,7 +53,7 @@ def get_transform(
         [
             v2.RandomHorizontalFlip(p=0.5) if flip_horizontal else NoOp(), 
             RandomizedRotation() if rotation else NoOp(),
-            # v2.Resize(new_size) if new_size is not None else NoOp(),
+            v2.Resize(new_size) if new_size is not None else NoOp(),
             v2.ToTensor(),
             v2.ToDtype(torch.float32),
         ]
@@ -168,6 +168,7 @@ class EstoniaZIRGB(Dataset):
         image_set: str = "train",
         max_samples: Optional[int] = None,
         adjust_range: bool = False,
+        normalize_intensity: bool = True,
     ):
         super().__init__()
 
@@ -180,6 +181,7 @@ class EstoniaZIRGB(Dataset):
         self.max_samples = max_samples
         self.transform = get_transform(rotation=True, flip_horizontal=True)
         self.adjust_range = adjust_range
+        self.normalize_intensity = normalize_intensity
 
         dataset_path = os.path.join(self.base_dir, self.dataset)
 
@@ -188,9 +190,7 @@ class EstoniaZIRGB(Dataset):
         self.zi_samples = sorted(os.listdir(self.zi_path))[:max_samples]
         self.rgb_samples = sorted(os.listdir(self.rgb_path))[:max_samples]
 
-        assert len(self.rgb_samples) == len(
-            self.zi_samples
-        ), "Number of samples in RGB and Z folders do not match"
+        assert len(self.rgb_samples) == len(self.zi_samples), "Nr. of input and target samples don't match"
 
     def __len__(self) -> int:
         return len(self.rgb_samples)
@@ -200,6 +200,9 @@ class EstoniaZIRGB(Dataset):
         label_path = os.path.join(self.rgb_path, self.rgb_samples[index])
 
         input = np.load(input_path)
+        # normalize the intensity channel by the Z channel, avoid division by zero
+        if self.normalize_intensity:
+            input[:, :, 0] = input[:, :, 0] / np.maximum(input[:, :, 1], 1e-6)
         label = np.load(label_path)
 
         if self.transform is not None:
@@ -222,7 +225,7 @@ class EstoniaZRGB(Dataset):
         dataset: str = "estonia-z",
         image_set: str = "train",
         max_samples: Optional[int] = None,
-        adjust_range: bool = False,
+        adjust_range: bool = False
     ):
         super().__init__()
 
@@ -243,9 +246,7 @@ class EstoniaZRGB(Dataset):
         self.z_samples = sorted(os.listdir(self.z_path))[:max_samples]
         self.rgb_samples = sorted(os.listdir(self.rgb_path))[:max_samples]
 
-        assert len(self.rgb_samples) == len(
-            self.z_samples
-        ), "Number of samples in RGB and Z folders do not match"
+        assert len(self.rgb_samples) == len(self.z_samples), "Nr. of input and target samples don't match"
 
     def __len__(self) -> int:
         return len(self.rgb_samples)
@@ -298,9 +299,7 @@ class EstoniaIRGB(Dataset):
         self.i_samples = sorted(os.listdir(self.i_path))[:max_samples]
         self.rgb_samples = sorted(os.listdir(self.rgb_path))[:max_samples]
 
-        assert len(self.rgb_samples) == len(
-            self.i_samples
-        ), "Number of samples in RGB and Z folders do not match"
+        assert len(self.rgb_samples) == len(self.i_samples), "Nr. of input and target samples don't match"
 
     def __len__(self) -> int:
         return len(self.rgb_samples)
@@ -333,7 +332,7 @@ class Maps(Dataset):
     ):
         super().__init__()
 
-        assert dataset in ["maps"], "Dataset not supported for Maps"
+        assert dataset in ["maps", "graymaps"], "Dataset not supported for Maps"
         assert image_set in ["train", "test"]
 
         self.dataset = dataset
@@ -361,74 +360,15 @@ class Maps(Dataset):
         img = Image.open(os.path.join(self.images_path, self.image_samples[index]))
         img = self.transform(img)
 
-        # half left is input, half right is label
-        input = img[:, :, : img.shape[2] // 2]
-        label = img[:, :, img.shape[2] // 2 :]
-
-        input = self.resize(input)
-        label = self.resize(label)
-
-        if self.adjust_range:
-            input = adjust_range(input, (0, 1), (-1, 1))
-            label = adjust_range(label, (0, 1), (-1, 1))
-
-        return {"A": input, "B": label}
-
-
-class GrayMaps(Dataset):
-    def __init__(
-        self,
-        dataset: str = "maps",
-        image_set: str = "train",
-        max_samples: Optional[int] = None,
-        adjust_range: bool = False,
-    ):
-        super().__init__()
-
-        assert dataset in ["maps"], "Dataset not supported for Maps"
-        assert image_set in ["train", "test", "train+test"]
-
-        self.dataset = dataset
-        self.base_dir = os.environ.get("DATASET_ROOT") or "."
-        self.image_set = image_set
-        self.max_samples = max_samples
-        self.transform = v2.Compose(
-            [
-                v2.PILToTensor(),
-                v2.Lambda(lambda x: x / 255.0),
-                v2.ToDtype(torch.float32),
-            ]
-        )
-        self.resize = v2.Resize(256)
-        self.adjust_range = adjust_range
-
-        dataset_path = os.path.join(self.base_dir, self.dataset)
-        if self.image_set == "train+test":
-            self.train_images_path = os.path.join(dataset_path, "train")
-            self.test_images_path  = os.path.join(dataset_path, "test")
-            self.image_samples = sorted([os.path.join(self.train_images_path, x) for x in os.listdir(self.train_images_path)]) + \
-                                  sorted([os.path.join(self.test_images_path, x) for x in os.listdir(self.test_images_path)])
-        else:
-            self.images_path = os.path.join(dataset_path, image_set)
-            self.image_samples = sorted([os.path.join(self.images_path, x) for x in os.listdir(self.images_path)])
-
-        self.image_samples = self.image_samples[:self.max_samples]
-        
-    def __len__(self) -> int:
-        return len(self.image_samples)
-
-    def __getitem__(self, index):
-        img = Image.open(self.image_samples[index])
-        img = self.transform(img)
-
         # half left is street, half right is satellite
         input = img[:, :, img.shape[2] // 2 :]
-        input = rgb_to_grayscale(input)
+        if self.dataset == "graymaps":
+            input = rgb_to_grayscale(input)
         label = img[:, :, : img.shape[2] // 2]
 
         input = self.resize(input)
         label = self.resize(label)
-        
+
         if self.adjust_range:
             input = adjust_range(input, (0, 1), (-1, 1))
             label = adjust_range(label, (0, 1), (-1, 1))
