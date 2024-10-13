@@ -1,8 +1,8 @@
 import os
 import aim
 import sys
-import torch
 import fire
+import torch
 import datetime
 
 from pathlib import Path
@@ -22,12 +22,12 @@ class Trainer:
         base_dir = ".",
         model_dir = "saved_models",
         image_dir = "saved_images",
-        load_from_model_dir: str = "",
-        load_from_model_epoch: int = 0,
+        load_from_model_dir: str = "2024-10-11_21-18-34_estonia-z_resnet9",
+        load_from_model_epoch: int = 48,
         adjust_model_shape: bool = False,
         epochs: int = 15,
         epochs_decay: int = 35,
-        dataset_name: str = "graymaps",
+        dataset_name: str = "estonia-i",
         image_size: int = 256,
         input_image_channel: int = 1,
         target_image_channel: int = 3,
@@ -45,8 +45,8 @@ class Trainer:
         sample_num: int = 9,
         sample_grid: bool = True,
         save_every: int = 2,
-        loss_fns: list = ["gan", "cycle", "identity", "ssim", "tv"],
-        loss_weights: list = [1.0, 10.0, 0.5, 1.0, 2.0],
+        loss_fns: list = ["gan", "cycle", "identity", "ssim", "tv", "lpips"],
+        loss_weights: list = [1.0, 10.0, 0.5, 0.5, 1.0, 5.0],
         eval_fid: bool = True,
         eval_is: bool = False,
         eval_every: int = 2,
@@ -182,11 +182,13 @@ class Trainer:
         self.criterion_cycle = torch.nn.L1Loss()
         # self.criterion_identity = torch.nn.L1Loss()
         # self.criterion_ssim = SSIMLoss().to(self.device)
+        self.criterion_lpips = LPIPS().to(self.device)
         # self.criterion_tv = TVLoss().to(self.device)
         self.lambda_GAN = self.loss_weights[self.loss_fns.index("gan")]
         self.lambda_cycle = self.loss_weights[self.loss_fns.index("cycle")]
         # self.lambda_identity = self.loss_weights[self.loss_fns.index("identity")]
         # self.lambda_ssim = self.loss_weights[self.loss_fns.index("ssim")]
+        self.lambda_lpips = self.loss_weights[self.loss_fns.index("lpips")]
         # self.lambda_tv = self.loss_weights[self.loss_fns.index("tv")]
 
     def init_buffers(self):
@@ -334,12 +336,15 @@ class Trainer:
             state = default_evaluator.run([[fake, real]])
             self.G_AB.train()
         
-        self.fid = state.metrics["fid"] if self.eval_fid else 0.0
+        self.fid_score = state.metrics["fid"] if self.eval_fid else 0.0
         self.is_score = state.metrics["is"] if self.eval_is else 0.0
+
+        self.logger.track(self.fid_score, "fid")
+        self.logger.track(self.is_score, "is")
 
         # write to file
         with open(self.eval_dir / "evals.txt", "a") as f:
-            f.write(f"Epoch: {str(epoch).zfill(2)}, FID: {self.fid}, IS: {self.is_score}\n")
+            f.write(f"Epoch: {str(epoch).zfill(2)}, FID: {self.fid_score}, IS: {self.is_score}\n")
 
     def _zero_grad(self):
         self.optim_G_AB.zero_grad()
@@ -389,17 +394,21 @@ class Trainer:
                 loss_cycle = (loss_cycle_A + loss_cycle_B) * 0.5
 
                 # Total Variation loss
-                # loss_tv = self.criterion_tv(fake_A)  # do it only for AtoB
+                # loss_tv = self.criterion_tv(fake_B)
 
                 # Structural Similarity loss
                 # loss_ssim_G_A = self.criterion_ssim(fake_A, real_A)
                 # loss_ssim_G_B = self.criterion_ssim(fake_B, real_B)
                 # loss_ssim = (loss_ssim_G_A + loss_ssim_G_B) * 0.5
 
+                # Learned Perceptual Image Patch Similarity loss
+                loss_lpips = self.criterion_lpips(fake_B, real_B)
+
                 # Total loss (generator)
                 loss_G =  self.lambda_GAN * loss_adv_G
                 loss_G += self.lambda_cycle * loss_cycle
                 # loss_G += self.lambda_ssim * loss_ssim
+                loss_G += self.lambda_lpips * loss_lpips
                 # loss_G += self.lambda_identity * loss_identity
                 # loss_G += loss_tv * self.lambda_tv
                 
@@ -425,7 +434,7 @@ class Trainer:
                 self.optim_D_A.step()
                 self.optim_D_B.step()
 
-                if self.sample_every and i % self.sample_every == 0:
+                if self.sample_every and i % self.sample_every == 0 and i != 0:
                     self.sample_images(epoch, i, grid=self.sample_grid)
                 
                 if self.save_every and epoch % self.save_every == 0 and epoch != 0:
@@ -435,10 +444,13 @@ class Trainer:
                 self.logger.track(loss_G.item(), "loss_G")
                 self.logger.track(loss_adv_G.item(), "loss_adv_G")
                 self.logger.track(loss_cycle.item(), "loss_cycle")
+                # self.logger.track(loss_ssim.item(), "loss_ssim")
+                self.logger.track(loss_lpips.item(), "loss_lpips")
                 # self.logger.track(loss_identity.item(), "loss_identity")
                 # self.logger.track(loss_tv.item(), "loss_tv")
+
                 sys.stdout.write(
-                    "\r [Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f, adv: %f, cycle: %f]"
+                    "\r [Epoch %d/%d] [Batch %d/%d] [D loss: %f] [G loss: %f, adv: %f, cycle: %f, lpips: %f]"
                     % (
                         epoch+1,
                         self.total_epochs,
@@ -449,6 +461,7 @@ class Trainer:
                         loss_adv_G.item(),
                         loss_cycle.item(),
                         # loss_ssim.item(),
+                        loss_lpips.item(),
                         # loss_tv.item()
                     )
                 )

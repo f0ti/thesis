@@ -311,6 +311,8 @@ class EstoniaIRGB(Dataset):
         input = np.load(input_path)
         label = np.load(label_path)
 
+        
+
         if self.transform is not None:
             input = self.transform(input)
             label = self.transform(label)

@@ -16,8 +16,8 @@ load_dotenv()
 class Sampler():
     def __init__(
         self,
-        run_name: str = "2024-09-21_12-25-44_graymaps_resnet9",
-        model_epoch: str = "42",
+        run_name: str = "2024-10-11_21-18-34_estonia-z_resnet9",
+        model_epoch: str = "38",
         dataset_name: str = "estonia-z",
         threads: int = 8,
         generator_type: str = "resnet9",
@@ -26,6 +26,7 @@ class Sampler():
         target_channel: int = 3,
         num_samples: int = 9,
         save_images: bool = True,
+        merge_fake_real: bool = True,
         make_grid: bool = True
     ):
         model_dir = Path("saved_models")
@@ -45,6 +46,7 @@ class Sampler():
         
         self.num_samples = num_samples
         self.save_images = save_images
+        self.merge_fake_real = merge_fake_real
         self.make_grid = make_grid
         if self.save_images:
             self.image_dir = Path("sampled_images") / f"{run_name}_G_{generator_mode}_{model_epoch}_{dataset_name}"
@@ -115,8 +117,12 @@ class Sampler():
         show_grid(fake_grid)
         show_grid(real_grid)
         if self.save_images:
-            save_image(real_grid, os.path.join(self.image_dir, f"real_A_{self.num_samples}_{uid}.png"))
-            save_image(fake_grid, os.path.join(self.image_dir, f"fake_B_{self.num_samples}_{uid}.png"))
+            if self.merge_fake_real:
+                fake_real_grid = torch.cat((fake_grid, real_grid), 2)
+                save_image(fake_real_grid, os.path.join(self.image_dir, f"fake_real_{self.num_samples}_{uid}.png"))
+            else:                
+                save_image(real_grid, os.path.join(self.image_dir, f"real_A_{self.num_samples}_{uid}.png"))
+                save_image(fake_grid, os.path.join(self.image_dir, f"fake_B_{self.num_samples}_{uid}.png"))
 
     def sample_one(self):
         batch = next(iter(self.sample_dl))
