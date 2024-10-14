@@ -5,6 +5,9 @@ import torch
 from pathlib import Path
 from torch.utils.data import DataLoader
 from torchvision.utils import save_image, make_grid
+from ignite.engine import Engine
+from ignite.metrics import FID, InceptionScore
+from ignite.metrics.ssim import SSIM
 from dotenv import load_dotenv
 
 from data import *
@@ -16,26 +19,23 @@ load_dotenv()
 class Sampler():
     def __init__(
         self,
-        run_name: str = "2024-10-11_21-18-34_estonia-z_resnet9",
-        model_epoch: str = "38",
-        dataset_name: str = "estonia-z",
+        run_name: str = "2024-10-13_01-27-59_estonia-i_resnet9",
+        model_epoch: str = "28",
+        dataset_name: str = "estonia-i",
         threads: int = 8,
         generator_type: str = "resnet9",
         generator_mode: str = "AB",
         input_channel: int = 1,
         target_channel: int = 3,
         num_samples: int = 9,
+        adjust_range: bool = True,
         save_images: bool = True,
         merge_fake_real: bool = True,
         make_grid: bool = True
     ):
         model_dir = Path("saved_models")
-        if generator_mode == "AB":
-            self.model_path = model_dir / run_name / f"G_AB_{model_epoch}.pth"
-        elif generator_mode == "BA":
-            self.model_path = model_dir / run_name / f"G_BA_{model_epoch}.pth"
-        else:
-            raise ValueError(f"Unknown generator mode: {generator_mode}")
+        assert generator_mode in ["AB", "BA"], f"Unknown generator mode: {generator_mode}"
+        self.model_path = model_dir / run_name / f"G_{generator_mode}_{model_epoch}.pth"
         
         self.dataset_name = dataset_name
         self.threads = threads
@@ -43,6 +43,7 @@ class Sampler():
         self.generator_mode = generator_mode
         self.input_channel = input_channel
         self.target_channel = target_channel
+        self.adjust_range = adjust_range
         
         self.num_samples = num_samples
         self.save_images = save_images
@@ -90,11 +91,11 @@ class Sampler():
         elif self.dataset_name == "graymaps":
             self.sample_set = Maps(dataset="graymaps", image_set="test", max_samples=self.num_samples)
         elif self.dataset_name == "estonia-z":
-            self.sample_set = EstoniaZRGB(image_set="test", max_samples=self.num_samples)
+            self.sample_set = EstoniaZRGB(image_set="test", max_samples=self.num_samples, adjust_range=self.adjust_range)
         elif self.dataset_name == "estonia-i":
-            self.sample_set = EstoniaIRGB(image_set="test", max_samples=self.num_samples)
+            self.sample_set = EstoniaIRGB(image_set="test", max_samples=self.num_samples, adjust_range=self.adjust_range)
         elif self.dataset_name == "estonia-zi":
-            self.sample_set = EstoniaZIRGB(image_set="test", max_samples=self.num_samples)
+            self.sample_set = EstoniaZIRGB(image_set="test", max_samples=self.num_samples, adjust_range=self.adjust_range)
         else:
             raise ValueError(f"Unknown dataset: {self.dataset_name}")
 
@@ -139,5 +140,123 @@ class Sampler():
             save_image(real_B, os.path.join(self.image_dir, f"real_B_{uid}.png"))  # target
             save_image(fake_B, os.path.join(self.image_dir, f"fake_B_{uid}.png"))  # output
 
+
+class Evaluator():
+    def __init__(
+        self,
+        base_dir = Path("."),
+        model_name: str = "2024-10-13_01-27-59_estonia-i_resnet9",
+        model_epoch: str = "28",
+        model_mode: str = "AB",
+        generator_type: str = "resnet9",
+        dataset_name: str = "estonia-i",
+        threads: int = 8,
+        input_channel: int = 1,
+        target_channel: int = 3,
+        eval_fid: bool = True,
+        eval_is: bool = False,
+        eval_ssim: bool = False,
+        eval_samples: int = 2000,
+        eval_batch_size: int = 8,
+        ) -> None:
+
+        self.model_path = f"{model_name}/G_{model_mode}_{model_epoch}.pth"
+        self.eval_fid = eval_fid
+        self.eval_is = eval_is
+        self.eval_ssim = eval_ssim
+        self.eval_samples = eval_samples
+        self.eval_batch_size = eval_batch_size
+        self.eval_dir = base_dir / 'eval' / model_name
+
+        # TODO: get this from the model name
+        self.dataset_name = dataset_name
+        self.threads = threads
+        self.model_mode = model_mode
+        self.generator_type = generator_type
+        self.input_channel = input_channel
+        self.target_channel = target_channel
+
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        
+        self.init_generator()
+        self.init_dataloader()
+
+    def init_generator(self):
+        if self.generator_type == "resnet6":
+            if self.model_mode == "AB":
+                self.gen = GeneratorResNet(self.input_channel, self.target_channel, n_blocks=6).to(self.device)
+            else:
+                self.gen = GeneratorResNet(self.target_channel, self.input_channel, n_blocks=6).to(self.device)
+        elif self.generator_type == "resnet9":
+            if self.model_mode == "AB":
+                self.gen = GeneratorResNet(self.input_channel, self.target_channel, n_blocks=9).to(self.device)
+            else:
+                self.gen = GeneratorResNet(self.target_channel, self.input_channel, n_blocks=9).to(self.device)
+        elif self.generator_type == "unet":
+            if self.model_mode == "AB":
+                self.gen = GeneratorUNet(self.input_channel, self.target_channel, num_downs=8).to(self.device)
+            else:
+                self.gen = GeneratorUNet(self.target_channel, self.input_channel, num_downs=8).to(self.device)
+        else:
+            raise ValueError(f"Unknown generator type: {self.generator_type}")
+
+    def init_dataloader(self):
+        if self.dataset_name == "melbourne-top":
+            self.eval_set = MelbourneXYZRGB(image_set="test", max_samples=self.eval_samples)
+        elif self.dataset_name == "melbourne-z-top":
+            self.eval_set = MelbourneZRGB(image_set="test", max_samples=self.eval_samples)
+        elif self.dataset_name == "maps":
+            self.eval_set = Maps(dataset="maps", image_set="test", max_samples=self.eval_samples)
+        elif self.dataset_name == "graymaps":
+            self.eval_set = Maps(dataset="graymaps", image_set="test", max_samples=self.eval_samples)
+        elif self.dataset_name == "estonia-z":
+            self.eval_set = EstoniaZRGB(image_set="test", max_samples=self.eval_samples)
+        elif self.dataset_name == "estonia-i":
+            self.eval_set = EstoniaIRGB(image_set="test", max_samples=self.eval_samples)
+        elif self.dataset_name == "estonia-zi":
+            self.eval_set = EstoniaZIRGB(image_set="test", max_samples=self.eval_samples)
+        else:
+            raise ValueError(f"Unknown dataset: {self.dataset_name}")
+
+        self.eval_dl = DataLoader(dataset=self.eval_set, num_workers=self.threads, batch_size=self.eval_batch_size, shuffle=False, drop_last=True)
+
+        self.gen.load_state_dict(torch.load(self.model_path))
+        self.gen.eval()
+        print(f"Loaded generator from path {self.model_path}")
+
+    def eval(self, epoch):
+        def eval_step(_, batch):
+            return batch
+
+        default_evaluator = Engine(eval_step)
+        if self.eval_is:
+            is_metric = InceptionScore()
+            is_metric.attach(default_evaluator, "is")
+        if self.eval_fid:
+            fid_metric = FID()
+            fid_metric.attach(default_evaluator, "fid")
+        if self.eval_ssim:
+            ssim_metric = SSIM(data_range=-.1)
+            ssim_metric.attach(default_evaluator, "ssim")
+
+        # get evaluation samples
+        with torch.no_grad():
+            self.gen.eval()
+            fake, real = Tensor([]).to(self.device), Tensor([]).to(self.device)
+            for eval_batch in self.eval_dl:
+                fake = torch.cat((fake, self.gen(eval_batch["A"].to(self.device))), 0)
+                real = torch.cat((real, eval_batch["B"].to(self.device)), 0)
+
+            state = default_evaluator.run([[fake, real]])
+            self.gen.train()
+        
+        self.fid_score = state.metrics["fid"] if self.eval_fid else 0.0
+        self.is_score = state.metrics["is"] if self.eval_is else 0.0
+
+        # write to file
+        with open(self.eval_dir / "evals.txt", "a") as f:
+            f.write(f"Epoch: {str(epoch).zfill(2)}, FID: {self.fid_score}, IS: {self.is_score}\n")
+
 if __name__ == "__main__":
-    fire.Fire(Sampler)
+    # fire.Fire(Sampler)
+    fire.Fire(Evaluator)

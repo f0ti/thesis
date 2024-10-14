@@ -7,7 +7,7 @@ import datetime
 
 from pathlib import Path
 from ignite.engine import Engine
-from ignite.metrics import FID, InceptionScore
+from ignite.metrics import FID, InceptionScore, SSIM
 from torch.utils.data import DataLoader
 from torchvision.utils import save_image, make_grid
 
