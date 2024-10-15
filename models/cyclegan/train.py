@@ -22,7 +22,7 @@ class Trainer:
         base_dir = ".",
         model_dir = "saved_models",
         image_dir = "saved_images",
-        load_from_model_dir: str = "2024-10-11_21-18-34_estonia-z_resnet9",
+        load_from_model_dir: str = "2024-10-11_18-18-30_graymaps_resnet9",
         load_from_model_epoch: int = 48,
         adjust_model_shape: bool = False,
         epochs: int = 15,
@@ -319,10 +319,10 @@ class Trainer:
 
         default_evaluator = Engine(eval_step)
         if self.eval_is:
-            is_metric = InceptionScore()
+            is_metric = InceptionScore(device=self.device, output_transform=lambda x: x[0])
             is_metric.attach(default_evaluator, "is")
         if self.eval_fid:
-            fid_metric = FID()
+            fid_metric = FID(device=self.device)
             fid_metric.attach(default_evaluator, "fid")
 
         # get evaluation samples

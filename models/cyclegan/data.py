@@ -4,6 +4,7 @@ import numpy as np
 
 from PIL import Image
 from torch import Tensor
+from random import shuffle
 from typing import Optional, Tuple, Any
 from torch.utils.data import Dataset
 from torchvision.transforms import v2
@@ -243,8 +244,17 @@ class EstoniaZRGB(Dataset):
 
         self.z_path = os.path.join(dataset_path, image_set, "z_data")
         self.rgb_path = os.path.join(dataset_path, image_set, "rgb_data")
-        self.z_samples = sorted(os.listdir(self.z_path))[:max_samples]
-        self.rgb_samples = sorted(os.listdir(self.rgb_path))[:max_samples]
+        self.z_samples = sorted(os.listdir(self.z_path))
+        self.rgb_samples = sorted(os.listdir(self.rgb_path))
+
+        # shuffle the samples similarly
+        if image_set == "test":
+            samples = list(zip(self.z_samples, self.rgb_samples))
+            shuffle(samples)
+            self.z_samples, self.rgb_samples = zip(*samples)
+
+        self.z_samples = self.z_samples[:max_samples]
+        self.rgb_samples = self.rgb_samples[:max_samples]
 
         assert len(self.rgb_samples) == len(self.z_samples), "Nr. of input and target samples don't match"
 
@@ -296,8 +306,17 @@ class EstoniaIRGB(Dataset):
 
         self.i_path = os.path.join(dataset_path, image_set, "i_data")
         self.rgb_path = os.path.join(dataset_path, image_set, "rgb_data")
-        self.i_samples = sorted(os.listdir(self.i_path))[:max_samples]
-        self.rgb_samples = sorted(os.listdir(self.rgb_path))[:max_samples]
+        self.i_samples = sorted(os.listdir(self.i_path))
+        self.rgb_samples = sorted(os.listdir(self.rgb_path))
+
+        # shuffle the samples similarly
+        if image_set == "test":
+            samples = list(zip(self.i_samples, self.rgb_samples))
+            shuffle(samples)
+            self.i_samples, self.rgb_samples = zip(*samples)
+
+        self.i_samples = self.i_samples[:max_samples]
+        self.rgb_samples = self.rgb_samples[:max_samples]
 
         assert len(self.rgb_samples) == len(self.i_samples), "Nr. of input and target samples don't match"
 
@@ -309,9 +328,7 @@ class EstoniaIRGB(Dataset):
         label_path = os.path.join(self.rgb_path, self.rgb_samples[index])
 
         input = np.load(input_path)
-        label = np.load(label_path)
-
-        
+        label = np.load(label_path)        
 
         if self.transform is not None:
             input = self.transform(input)
@@ -376,3 +393,61 @@ class Maps(Dataset):
             label = adjust_range(label, (0, 1), (-1, 1))
 
         return {"A": input, "B": label}
+
+
+class TileSelector(Dataset):
+    def __init__(
+        self,
+        dataset: str = "estonia-i",
+        image_set: str = "test",
+        max_samples: Optional[int] = None,
+        adjust_range: bool = False,
+        tile_id: Optional[str] = None,
+    ):
+        super().__init__()
+
+        assert dataset in ["estonia-i"], "Dataset not supported for TileSelector"
+        assert image_set in ["test", "val"]
+
+        self.dataset = dataset
+        self.base_dir = os.environ.get("DATASET_ROOT") or "."
+        self.image_set = image_set
+        self.max_samples = max_samples
+        self.transform = get_transform(rotation=True, flip_horizontal=True)
+        self.adjust_range = adjust_range
+        self.tile_id = tile_id
+        self.data_type = dataset.split("-")[-1]
+
+        dataset_path = os.path.join(self.base_dir, self.dataset)
+
+        self.coo_path = os.path.join(dataset_path, image_set, f"{self.data_type}_data")
+        self.rgb_path = os.path.join(dataset_path, image_set, "rgb_data")
+
+        self.xyz_samples = sorted(os.listdir(self.coo_path))
+        self.rgb_samples = sorted(os.listdir(self.rgb_path))
+
+        if self.tile_id is not None:
+            self.xyz_samples = [sample for sample in self.xyz_samples if self.tile_id in sample]
+            self.rgb_samples = [sample for sample in self.rgb_samples if self.tile_id in sample]
+
+        self.xyz_samples = self.xyz_samples[:max_samples]
+        self.rgb_samples = self.rgb_samples[:max_samples]
+
+        assert len(self.rgb_samples) == len(self.xyz_samples), "Number of samples in RGB and XYZ folders do not match"
+
+    def __len__(self) -> int:
+        return len(self.rgb_samples)
+
+    def __getitem__(self, index):
+        input_path = os.path.join(self.coo_path, self.xyz_samples[index])
+        label_path = os.path.join(self.rgb_path, self.rgb_samples[index])
+
+        file_id = self.xyz_samples[index].split(".")[0]
+
+        input = np.load(input_path)
+        label = np.load(label_path)
+
+        input = self.transform(input)
+        label = self.transform(label)
+
+        return {"A": input, "B": label, "tile_id": file_id}

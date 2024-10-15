@@ -95,8 +95,8 @@ saved_models/
 saved_images/
 saved_gifs/
 sampled_images/
+colorized_images/
 eval/
-clean
 models_vault/
 .aim/
 dsri_aim/

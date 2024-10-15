@@ -1,5 +1,6 @@
 import os
 import fire
+from sympy import false
 import torch
 
 from pathlib import Path
@@ -19,9 +20,9 @@ load_dotenv()
 class Sampler():
     def __init__(
         self,
-        run_name: str = "2024-10-13_01-27-59_estonia-i_resnet9",
-        model_epoch: str = "28",
-        dataset_name: str = "estonia-i",
+        run_name: str = "2024-10-15_11-38-12_estonia-z_resnet9",
+        model_epoch: str = "12",
+        dataset_name: str = "estonia-z",
         threads: int = 8,
         generator_type: str = "resnet9",
         generator_mode: str = "AB",
@@ -89,7 +90,7 @@ class Sampler():
         elif self.dataset_name == "maps":
             self.sample_set = Maps(dataset="maps", image_set="test", max_samples=self.num_samples)
         elif self.dataset_name == "graymaps":
-            self.sample_set = Maps(dataset="graymaps", image_set="test", max_samples=self.num_samples)
+            self.sample_set = Maps(dataset="graymaps", image_set="test", max_samples=self.num_samples, adjust_range=self.adjust_range)
         elif self.dataset_name == "estonia-z":
             self.sample_set = EstoniaZRGB(image_set="test", max_samples=self.num_samples, adjust_range=self.adjust_range)
         elif self.dataset_name == "estonia-i":
@@ -125,6 +126,7 @@ class Sampler():
                 save_image(real_grid, os.path.join(self.image_dir, f"real_A_{self.num_samples}_{uid}.png"))
                 save_image(fake_grid, os.path.join(self.image_dir, f"fake_B_{self.num_samples}_{uid}.png"))
 
+    # TODO: fix shape of input images
     def sample_one(self):
         batch = next(iter(self.sample_dl))
         uid = identifier()
@@ -145,8 +147,8 @@ class Evaluator():
     def __init__(
         self,
         base_dir = Path("."),
-        model_name: str = "2024-10-13_01-27-59_estonia-i_resnet9",
-        model_epoch: str = "28",
+        model_name: str = "2024-10-11_18-18-30_graymaps_resnet9",
+        model_epoch: str = "48",
         model_mode: str = "AB",
         generator_type: str = "resnet9",
         dataset_name: str = "estonia-i",
@@ -154,13 +156,14 @@ class Evaluator():
         input_channel: int = 1,
         target_channel: int = 3,
         eval_fid: bool = True,
-        eval_is: bool = False,
-        eval_ssim: bool = False,
+        eval_is: bool = True,
+        eval_ssim: bool = True,
         eval_samples: int = 2000,
         eval_batch_size: int = 8,
         ) -> None:
 
-        self.model_path = f"{model_name}/G_{model_mode}_{model_epoch}.pth"
+        model_dir = Path("saved_models")
+        self.model_path = model_dir / f"{model_name}/G_{model_mode}_{model_epoch}.pth"
         self.eval_fid = eval_fid
         self.eval_is = eval_is
         self.eval_ssim = eval_ssim
@@ -224,19 +227,19 @@ class Evaluator():
         self.gen.eval()
         print(f"Loaded generator from path {self.model_path}")
 
-    def eval(self, epoch):
+    def eval(self):
         def eval_step(_, batch):
             return batch
 
         default_evaluator = Engine(eval_step)
         if self.eval_is:
-            is_metric = InceptionScore()
+            is_metric = InceptionScore(device=self.device, output_transform=lambda x: x[0])
             is_metric.attach(default_evaluator, "is")
         if self.eval_fid:
-            fid_metric = FID()
+            fid_metric = FID(device=self.device)
             fid_metric.attach(default_evaluator, "fid")
         if self.eval_ssim:
-            ssim_metric = SSIM(data_range=-.1)
+            ssim_metric = SSIM(data_range=2.0, device=self.device)
             ssim_metric.attach(default_evaluator, "ssim")
 
         # get evaluation samples
@@ -247,16 +250,19 @@ class Evaluator():
                 fake = torch.cat((fake, self.gen(eval_batch["A"].to(self.device))), 0)
                 real = torch.cat((real, eval_batch["B"].to(self.device)), 0)
 
-            state = default_evaluator.run([[fake, real]])
-            self.gen.train()
+        print(fake.shape, real.shape)
+        state = default_evaluator.run([[fake, real]])
         
         self.fid_score = state.metrics["fid"] if self.eval_fid else 0.0
         self.is_score = state.metrics["is"] if self.eval_is else 0.0
+        self.ssim_score = state.metrics["ssim"] if self.eval_ssim else 0.0
 
         # write to file
         with open(self.eval_dir / "evals.txt", "a") as f:
-            f.write(f"Epoch: {str(epoch).zfill(2)}, FID: {self.fid_score}, IS: {self.is_score}\n")
+            log = f"FID: {self.fid_score:.3f}, IS: {self.is_score}, SSIM: {self.ssim_score}\n"
+            f.write(log)
+            print(log)
 
 if __name__ == "__main__":
-    # fire.Fire(Sampler)
-    fire.Fire(Evaluator)
+    fire.Fire(Sampler)
+    # fire.Fire(Evaluator)
