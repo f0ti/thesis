@@ -10,3 +10,5 @@ __pycache__/
 env/
 .env
 models/dualgan
+colorize.py
+colorized_output/

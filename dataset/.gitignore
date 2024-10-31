@@ -2,6 +2,5 @@ melbourne*/
 *maps/
 estonia*/
 filtered_out*/
-utils/experiment.py
 *.pt
 *.txt

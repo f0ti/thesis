@@ -1,9 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
+
 from tqdm import tqdm
 from struct import unpack
-from point import Point
 from typing import List
+
+from point import Point
 
 QUIET = True
 
@@ -62,9 +64,9 @@ class Tile:
                 b = data[5]
                 intensity = data[6]
                 point_id = data[7]
-                bool = data[8]
+                isEmpty = data[8]
 
-                point = Point(x, y, z, r, g, b, intensity, point_id, bool)
+                point = Point(x, y, z, r, g, b, intensity, point_id, isEmpty)
                 self.points.append(point)
 
     def show(self) -> None:
